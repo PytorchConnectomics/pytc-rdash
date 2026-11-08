@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# rsub — submit a card's job from this checkout; a receipt beside the run records it.
+#
+#   dashboard/bin/rsub <project> cards/<file>.md [--step S] [--test-only] [--ref R]
+#
+# Run it on the machine that holds the code (cajal). On the card's own host it
+# stages and submits locally; elsewhere it does so over SSH. The card's scripts/
+# must be committed, or pass --ref (e.g. origin/main after a fetch) to read card and
+# scripts from that commit. Nothing is edited or pushed: the receipt is
+# <runs root>/<project>/receipts/<job>.json on the host, and g02 collects it within
+# a minute. See dashboard/RECEIPTS.md.
+set -euo pipefail
+root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
+source "$root/dashboard/app/rdash_env.sh"
+[ $# -ge 2 ] || { sed -n '4p' "$0" | sed 's/^# *//' >&2; exit 2; }
+project=$1 card=$2; shift 2
+step=() args=("$@")
+while [ $# -gt 0 ]; do
+    case "$1" in
+    --step) [ $# -ge 2 ] && step=(--step "$2"); shift ;;
+    --ref) [ $# -ge 2 ] && step+=(--ref "$2"); shift ;;
+    esac
+    shift
+done
+cd "$root"
+export RDASH_REPO_ROOT=$root RDASH_HOST_ALIAS=${RDASH_HOST_ALIAS:-$(hostname -s)}
+# Reach only the card's host: on that host nothing needs SSH at all.
+host=$(RDASH_SSH_HOSTS= python3 -B -m dashboard.app.launch --project "$project" --card "$card" "${step[@]}" --print-host)
+if [ "$host" = "$RDASH_HOST_ALIAS" ]; then export RDASH_SSH_HOSTS=; else export RDASH_SSH_HOSTS=$host; fi
+exec python3 -B -m dashboard.app.launch --project "$project" --card "$card" "${args[@]}"

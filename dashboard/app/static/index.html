@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Research · Contract execution</title>
+<link rel="stylesheet" href="/static/styles.css">
+<script src="/static/app.js" defer></script>
+</head>
+<body>
+<header>
+  <h1>Research</h1>
+  <div class="sub">Explore ideas. Design probes. Learn from evidence. · Cards in research/projects/&lt;project&gt;/cards/</div>
+  <p id="board-owner" class="sub"></p>
+  <nav>
+    <button class="primary" id="new">+ Add idea</button>
+    <button id="refresh">Refresh</button>
+    <span class="view-toggle" role="group" aria-label="View">
+      <button type="button" id="view-ladder" aria-pressed="false">Ladder</button>
+      <button type="button" id="view-week" aria-pressed="false">This week</button>
+      <button type="button" id="view-runs" aria-pressed="false">Runs</button>
+      <button type="button" id="view-batches" aria-pressed="false">Batches</button>
+      <button type="button" id="view-milestones" aria-pressed="false">Milestones</button>
+      <button type="button" id="view-tasks" aria-pressed="true">Tasks</button>
+    </span>
+    <details id="show-panel" class="show-panel"><summary id="show-label">Show</summary><div id="show-options"></div></details>
+    <select id="project" aria-label="Project"><option value="">Select a project</option></select>
+    <select id="card-owner" aria-label="Card owner"><option value="">All owners</option></select>
+    <select id="batch-filter" aria-label="Batch"><option value="">All batches</option></select>
+    <select id="volume-filter" aria-label="Data volume"><option value="">All volumes</option></select>
+    <select id="stage-filter" aria-label="Research stage"><option value="">All stages</option></select>
+    <select id="owner" aria-label="Next owner" title="Suggested next-action owner; assigning an agent does not start a worker"><option value="">All owners</option><option value="you">You</option><option value="agent">Agent</option><option value="scheduler">Scheduler</option><option value="none">Closed</option></select>
+    <select id="task-filter" aria-label="Task"><option value="">All tasks</option></select>
+  </nav>
+</header>
+<main>
+  <p class="sub" id="ignored"></p>
+  <p id="status" role="status"></p>
+  <p id="error" class="error" role="alert"></p>
+  <div id="board" class="board"></div>
+</main>
+<footer>Structure is not authority. Artifact presence is not validation. Job completion is not correctness. Evidence feedback goes to card discussion; acceptance and verdict remain read-only.</footer>
+
+<dialog id="detail">
+  <button class="close" type="button" id="detail-close">Close</button>
+  <button class="close" type="button" id="raw-toggle">Raw</button>
+  <h2 id="title"></h2>
+  <p class="sub" id="path"></p>
+  <p id="jobs" hidden></p>
+  <p class="error" id="readonly"></p>
+  <p id="evidence-save-status" role="status"></p>
+  <div id="summaries"></div>
+  <div id="acceptance-panel">
+  <p class="sub">Acceptance and verdict are read-only here. Only a person settles acceptance with evidence and records a verdict.</p>
+  <div id="acceptance-items"></div>
+  </div>
+  <div id="body"></div>
+  <form id="update">
+    <label for="stage">Research stage</label>
+    <!-- Options are filled from /api/stages; see app.js. -->
+    <select id="stage"></select>
+    <label for="note">Add an idea, hypothesis revision, evidence reference, or session link</label>
+    <textarea id="note" maxlength="2000" placeholder="What should we investigate next, and why?"></textarea>
+    <p id="save-error" class="error" role="alert"></p>
+    <button class="primary">Save to card</button>
+  </form>
+</dialog>
+
+<dialog id="question">
+  <button class="close" type="button" id="question-close">Close</button>
+  <button class="close" type="button" id="q-filter">Show its cards</button>
+  <h2 id="q-title"></h2>
+  <p class="sub" id="q-path"></p>
+  <div id="q-body"></div>
+</dialog>
+
+<dialog id="compose">
+  <button class="close" type="button" id="compose-close">Close</button>
+  <h2>Add idea</h2>
+  <form id="idea">
+    <label for="idea-title">Title</label>
+    <input id="idea-title" required maxlength="120">
+    <label for="idea-track">Track</label>
+    <input id="idea-track" value="model" required maxlength="32">
+    <label for="idea-body">The idea</label>
+    <textarea id="idea-body" maxlength="2000"
+              placeholder="What should we investigate next, and why?"></textarea>
+    <p id="idea-error" class="error" role="alert"></p>
+    <button class="primary">Create idea</button>
+  </form>
+</dialog>
+</body>
+</html>

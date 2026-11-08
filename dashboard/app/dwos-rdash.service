@@ -1,0 +1,20 @@
+[Unit]
+Description=rdash coordination board on g02
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/rdash/research
+Environment=RDASH_HOST=g02
+Environment=RDASH_HOST_ALIAS=g02
+Environment=RDASH_REMOTE_ROOT=/home/hanson/rdash/research
+Environment=RDASH_SSH_HOSTS=cajal,bc
+Environment=RESEARCH_DASH_PORT=8766
+ExecStart=/usr/bin/python3 -B %h/rdash/research/dashboard/app/rdash_service.py
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=25
+
+[Install]
+WantedBy=default.target

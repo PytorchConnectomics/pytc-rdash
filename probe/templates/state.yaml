@@ -1,0 +1,46 @@
+# Probe v2 project state. Null means unknown/unfilled, never zero or permission.
+# The coordinator fills this template from the project spec; no script validates readiness.
+# Generic method and adoption revision are resolved through method_ref.
+schema_version: 2
+method_ref: loop.md
+project_id: null
+updated_at: null
+
+objective:
+  question: null
+  # May be multiple measured properties or a qualitative discriminating observation.
+  success_criteria: null
+  evaluation_ref: null  # project loop/evaluation record; runs freeze the actual version
+
+current_result:
+  summary: null
+  values: {}  # label -> value with units/uncertainty as applicable; leave unknowns null
+  evidence_ref: null
+  evaluation_revision: null
+  observed_at: null
+
+# Optional decomposition when useful. No measured bound or headroom is required.
+# Each track may include id, question, current_ref, bound_ref, scope, and open_levers.
+tracks: []
+
+# Each candidate has id, question/hypothesis_ref, decision_relevance, evidence,
+# expected_information_or_benefit, and estimated_cost with explicit units/basis.
+# A numeric selection score is optional and only meaningful for comparable quantities.
+levers: []
+
+# Keep only open work here. Each entry identifies run_id, lever_id, phase,
+# preregistration_ref, task_contract_ref, and recorded job/process/artifact references.
+# Task-level authority and budget consumption have one owning ledger, linked from the run.
+active_runs: []
+
+# Closed outcomes and their reasoning are indexed in lessons/lessons.md.
+lessons_index: lessons/lessons.md
+
+# Evidence-backed scientific constraints have bounded applicability, not global kills.
+# Each entry includes id, statement, status (proposed | active | reopened | retired),
+# applicability/assumptions, evidence_ref, limitations, reopen_when, review_ref,
+# and adopted_at/authority when active. Detailed reasoning stays in its lesson.
+constraints: []
+
+# Questions needing evidence or a consequential human/planner decision.
+open_questions: []

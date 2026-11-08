@@ -1,0 +1,238 @@
+:root { font-family: system-ui, sans-serif; color: #20302e; background: #f3f5f1; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+
+header { padding: 30px 4vw 20px; border-bottom: 1px solid #d4ded8; background: #fff; }
+h1 { margin: 0 0 8px; font-size: 28px; }
+p { line-height: 1.5; }
+.sub { color: #60706a; font-size: 14px; }
+nav { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
+
+button, select, input, textarea {
+  font: inherit; border: 1px solid #c9d5cc; border-radius: 8px;
+  padding: 10px; background: #fff; color: inherit;
+}
+button { cursor: pointer; }
+button:hover { border-color: #236b55; }
+button.primary { background: #236b55; color: #fff; }
+button[disabled] { opacity: .6; cursor: progress; }
+
+main { padding: 24px 4vw; }
+.board { display: block; }
+.lane { background: #e8eee8; padding: 16px; border-radius: 12px; }
+.lane h2 { font-size: 15px; margin: 0 0 16px; }
+.lane .count { color: #60706a; font-weight: normal; }
+
+.card {
+  display: block; text-align: left; width: 100%; margin: 12px 0; padding: 18px;
+  border: 1px solid #dce4dc; box-shadow: 0 2px 5px #18302008;
+}
+.card strong { display: block; font-size: 17px; line-height: 1.4; }
+.card.readonly { border-style: dashed; }
+.tag {
+  display: inline-block; font-size: 12px; margin: 12px 5px 4px 0;
+  background: #edf3ee; padding: 4px 7px; border-radius: 5px;
+}
+
+dialog {
+  border: 1px solid #d4ded8; border-radius: 16px;
+  width: min(850px, 94vw); max-height: 90vh; padding: 28px;
+}
+dialog::backdrop { background: #102b2466; }
+.close { float: right; }
+pre {
+  white-space: pre-wrap; overflow-wrap: anywhere;
+  font: 14px/1.6 ui-monospace, monospace;
+  background: #f5f7f3; padding: 18px; border-radius: 8px;
+}
+label { display: block; margin: 16px 0 7px; }
+textarea, input { width: 100%; }
+textarea { min-height: 110px; }
+.error { color: #a32424; white-space: pre-wrap; }
+#status { min-height: 22px; }
+footer { padding: 0 4vw 24px; color: #60706a; font-size: 13px; }
+
+/* Rendered card body. Block styling follows pm's .markdown-content. */
+.markdown-content { background: #f5f7f3; padding: 18px; border-radius: 8px; line-height: 1.6; }
+.markdown-content > :first-child { margin-top: 0; }
+.markdown-content > :last-child { margin-bottom: 0; }
+.markdown-content h1 { font-size: 1.4em; margin: 16px 0 8px; }
+.markdown-content h2 { font-size: 1.2em; margin: 14px 0 6px; }
+.markdown-content h3 { font-size: 1.1em; margin: 12px 0 4px; color: #3d534c; }
+.markdown-content h4, .markdown-content h5, .markdown-content h6 { font-size: 1em; margin: 12px 0 4px; color: #3d534c; }
+.markdown-content p { margin: 8px 0; }
+.markdown-content ul, .markdown-content ol { margin: 8px 0 8px 20px; padding: 0; }
+.markdown-content li { margin: 4px 0; list-style: revert; }
+.markdown-content code {
+  background: #e6ece6; padding: 1px 5px; border-radius: 4px;
+  font: .92em ui-monospace, monospace;
+}
+.markdown-content pre {
+  background: #eef2ec; padding: 14px; border-radius: 8px;
+  border: 1px solid #dce4dc; overflow-x: auto;
+}
+.markdown-content pre code { background: none; padding: 0; font-size: .88em; }
+.markdown-content blockquote {
+  margin: 8px 0; padding: 2px 14px; border-left: 3px solid #c9d5cc; color: #4a5a54;
+}
+.markdown-content hr { border: 0; border-top: 1px solid #d4ded8; margin: 16px 0; }
+.markdown-content table { border-collapse: collapse; margin: 12px 0; width: 100%; }
+.markdown-content th, .markdown-content td {
+  border: 1px solid #d4ded8; padding: 7px 10px; text-align: left; vertical-align: top;
+}
+.markdown-content th { background: #e8eee8; }
+.markdown-content a { color: #236b55; }
+/* Repo-relative targets are not links: the server does not serve repo documents. */
+.markdown-content .md-path {
+  color: #4a5a54; border-bottom: 1px dotted #9aaea6; cursor: help;
+}
+/* Raw view keeps the monospace block the rendered view must not inherit. */
+.raw {
+  white-space: pre-wrap; overflow-wrap: anywhere;
+  font: 14px/1.6 ui-monospace, monospace;
+  background: #f5f7f3; padding: 18px; border-radius: 8px;
+}
+#raw-toggle { margin-right: 8px; }
+
+/* Scheduler state. `unknown` is deliberately distinct from done: the scheduler
+   was unreachable or has forgotten the job, which is not the same as success. */
+/* A session chip that is an address rather than a label; underlined on hover
+   so the row does not read as a field of links. */
+a.tag.session-link { color: #1c4a2e; text-decoration: none; border: 1px solid #c3d8c9; }
+a.tag.session-link:hover, a.tag.session-link:focus { text-decoration: underline; background: #e2eee5; }
+.tag.job { border: 1px solid transparent; font-variant-numeric: tabular-nums; }
+.tag.job-run  { background: #d8ecd8; border-color: #8bbf8b; }
+.tag.job-wait { background: #eae6d4; border-color: #c4b98f; }
+.tag.job-done { background: #e4ebf2; border-color: #a9bed1; }
+.tag.job-bad  { background: #f3dcdc; border-color: #d29a9a; }
+.tag.job-unknown { background: #ececec; border-color: #bbb; color: #555; }
+#jobs { margin: 4px 0 12px; }
+
+/* The authored method steps. Numbered in the card, so numbered here, and tight
+   enough that three or four steps stay a cell rather than a paragraph. */
+.contract-tasks { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.45; }
+.contract-tasks li { margin-bottom: 3px; }
+/* The session's machine and working directory: the address you reattach at.
+   Paths are long, so it wraps rather than widening the column. */
+.session-where { margin: 0 0 8px; overflow-wrap: anywhere; }
+.card-title { font-weight: 650; text-align: left; margin-bottom: 8px; }
+#summaries { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+#summaries h3 { font-size: 14px; margin-bottom: 4px; }
+#acceptance-items input { width: auto; margin-right: 8px; }
+#acceptance-items label { overflow-wrap: anywhere; }
+.unreadable { margin-top: 24px; }
+@media (max-width: 850px) {
+  #summaries { grid-template-columns: 1fr; }
+}
+
+#body table { width: 100%; overflow-wrap: anywhere; }
+#body details { margin: 1rem 0; color: #777; }
+.delta-favorable { color: #208050; }
+.delta-unfavorable { color: #b65030; }
+
+.goal-panel { grid-column: 1 / -1; border: 1px solid #d4ded8; border-radius: 8px; padding: 14px; overflow-wrap: anywhere; }
+.goal-panel p { margin: 8px 0; }
+.goal-panel button { margin: 4px 8px 4px 0; }
+.goal-panel .goal-panel { margin-top: 12px; }
+.goal-decision { border-top: 1px solid #d4ded8; margin-top: 12px; padding-top: 8px; }
+.goal-decision select { display: block; max-width: 100%; margin-top: 6px; }
+.decision-context { margin: 10px 0; }
+.decision-context pre { max-height: 180px; overflow: auto; margin: 4px 0; }
+
+.evidence-panel { border: 1px solid #c9d5cc; border-radius: 10px; padding: 14px; margin: 18px 0; background: #fff; }
+.evidence-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.evidence-slot { min-width: 0; border-top: 1px solid #d4ded8; }
+.evidence-slot select { width: 100%; display: block; margin-top: 6px; }
+.evidence-slot label { margin-top: 10px; }
+.evidence-preview img { display: block; max-width: 100%; max-height: 420px; object-fit: contain; margin: 10px auto; }
+.evidence-preview pre { max-height: 360px; overflow: auto; font-size: 12px; }
+.evidence-provenance { overflow-wrap: anywhere; color: #60706a; font-size: 11px; }
+.evidence-feedback { border-top: 1px solid #d4ded8; padding-top: 2px; }
+.evidence-feedback button { margin-top: 8px; }
+.evidence-panel button[disabled] { cursor: not-allowed; }
+#evidence-save-status { color: #236b55; }
+@media (max-width: 680px) { .evidence-grid { grid-template-columns: 1fr; } }
+
+/* View toggle and the Tasks view: one lane per task, cards coloured by progress. */
+.view-toggle { display: inline-flex; gap: 0; }
+.view-toggle button { border-radius: 0; }
+.view-toggle button:first-child { border-radius: 6px 0 0 6px; }
+.view-toggle button:last-child { border-radius: 0 6px 6px 0; margin-left: -1px; }
+.view-toggle button[aria-pressed="true"] { background: #236b55; color: white; }
+.task-lanes { display: flex; gap: 14px; overflow-x: auto; align-items: flex-start; padding-bottom: 8px; }
+.task-lane { flex: 0 0 260px; background: #eef2ee; border-radius: 8px; padding: 10px; }
+.task-lane h2 { font-size: 15px; margin: 0 0 8px; text-transform: capitalize; }
+.task-lane h2 .sub { font-weight: normal; text-transform: none; font-size: 12px; }
+.task-card { display: block; width: 100%; text-align: left; margin: 0 0 8px; padding: 9px 10px;
+             border-radius: 6px; border: 1px solid; border-left-width: 6px; cursor: pointer; background: white; }
+.task-card strong { display: block; font-size: 14px; margin-bottom: 3px; }
+.task-card .sub { font-size: 12px; }
+.attention-next { margin-top: 4px; font-weight: 500; }
+.progress-done { border-color: #2e8b57; background: #e6f4ea; }
+.progress-in-progress { border-color: #d4a017; background: #fdf6dc; }
+.progress-todo { border-color: #c0392b; background: #fbe9e7; }
+.progress-planned { border-color: #b8bdb8; background: #f3f4f3; color: #555; }
+.dropped { opacity: .5; text-decoration: line-through; }
+.track-errors { border: 1px solid #c0392b; background: #fbe9e7; border-radius: 6px; padding: 4px 12px; margin-bottom: 12px; }
+.track-errors p { margin: 6px 0; font-size: 13px; }
+.track-status { font-weight: normal; font-size: 11px; border: 1px solid #b8bdb8; border-radius: 9px; padding: 0 6px; }
+.track-tile { cursor: default; }
+.run-table { border-collapse: separate; border-spacing: 4px; margin-bottom: 18px; }
+.run-table th { text-align: left; font-size: 13px; padding: 4px 6px; text-transform: capitalize; }
+.run-table tbody th { text-transform: none; white-space: nowrap; }
+.run-cell { border: 1px solid; border-radius: 6px; padding: 6px 8px; vertical-align: top; min-width: 140px; }
+.run-cell strong { font-size: 13px; }
+.run-cell .sub { font-size: 12px; }
+.cell-cards { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.cell-card { font-size: 11px; padding: 1px 6px; border: 1px solid; border-radius: 9px; cursor: pointer; }
+@media (max-width: 720px) {
+  .task-lanes { flex-direction: column; }
+  .task-lane { flex-basis: auto; width: 100%; box-sizing: border-box; }
+  .run-table, .run-table tbody, .run-table tr, .run-table td, .run-table th { display: block; }
+  .run-table thead { display: none; }
+}
+
+.milestones { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.milestone { flex: 1 1 260px; border: 1px solid; border-radius: 6px; padding: 8px 10px; }
+.milestone strong { display: block; font-size: 14px; margin-bottom: 3px; }
+.milestone .sub { font-size: 12px; }
+.question-tile { border-style: dashed; }
+.question-name { all: unset; cursor: pointer; font-weight: bold; font-size: 14px; }
+.question-name:hover, .question-name:focus-visible { text-decoration: underline; }
+.milestone-table { width: 100%; table-layout: fixed; }
+.milestone-table tbody th { white-space: normal; width: 16%; vertical-align: top; }
+.matrix-cell { vertical-align: top; background: #eef2ee; border-radius: 6px; padding: 6px; }
+#question-filter { max-width: 16em; }
+.milestone-table tbody th .sub { font-weight: normal; }
+
+.batches { display: grid; gap: 12px; max-width: 980px; }
+.batch { background: #fff; border: 1px solid #d4ded8; border-radius: 10px; padding: 10px 14px; }
+.batch summary { cursor: pointer; font-size: 15px; }
+.batch .sub { color: #60706a; font-size: 13px; }
+.batch button.link { border: 0; background: none; color: #2a6f97; cursor: pointer; text-decoration: underline; padding: 0; font: inherit; font-size: 13px; }
+.batch-summary { margin: 8px 0; font-size: 14px; line-height: 1.45; }
+.batch-steps { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 4px; }
+.batch-step { border-width: 0 0 0 4px; border-style: solid; border-radius: 4px; padding: 5px 8px; font-size: 13px; }
+.progress-failed { border-color: #8e1b1b; background: #f6d5d0; }
+
+.show-panel { position: relative; display: inline-block; }
+.show-panel > summary { cursor: pointer; list-style: none; padding: 9px 14px; border: 1px solid #c6d2cb; border-radius: 8px; background: #fff; }
+.show-panel[open] > #show-options { position: absolute; z-index: 5; top: calc(100% + 4px); left: 0; min-width: 320px; max-width: min(560px, 92vw); max-height: 70vh; overflow: auto;
+  background: #fff; border: 1px solid #c6d2cb; border-radius: 8px; padding: 10px 12px; box-shadow: 0 6px 18px rgba(0,0,0,.12); }
+#show-options fieldset { border: 0; margin: 0 0 8px; padding: 0; }
+#show-options legend { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+#show-options label { display: flex; align-items: flex-start; gap: 6px; margin: 0; font-size: 13px; padding: 3px 0; }
+#show-options input[type=checkbox] { width: auto; min-height: 0; margin: 2px 0 0; padding: 0; flex: none; }
+#show-options button.link { border: 0; background: none; color: #2a6f97; cursor: pointer; text-decoration: underline; padding: 0; font-size: 12px; font-weight: normal; }
+
+/* Runs view: receipts and unrecorded jobs. */
+.runs-table { border-collapse: collapse; margin-bottom: 18px; font-size: 13px; }
+.runs-table th, .runs-table td { text-align: left; padding: 3px 8px; border-bottom: 1px solid #e3e3e3; vertical-align: top; }
+.runs-table td.path { font-family: ui-monospace, monospace; font-size: 12px; word-break: break-all; }
+.tag.receipt { background: #f4f1ea; border: 1px solid #d6cfbd; }
+
+.ladder-month.current { background: #e8f2ff; }
+.ladder-row { border: 1px solid #ccd; padding: .6rem; margin: .5rem 0; }
+.gate-open { border-left: 3px solid #aaa; } .gate-failed { border-left: 3px solid #b22; }
+.gate-target { color: #666; font-style: italic; } .gate-none { color: #aaa; }
+.gate-bar { display: flex; gap: 3px; } .gate-bar .segment { width: 2rem; height: .6rem; border: 1px solid #999; } .gate-bar .met { background: #287d49; } .gate-bar .failed { border-color: #b22; }
