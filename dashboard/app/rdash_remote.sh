@@ -8,8 +8,8 @@ source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/rdash_env.sh"
 # the .agent-lock check all stay in one filesystem domain. Only an SSH tunnel
 # crosses the network.
 #
-#   RDASH_HOST          ssh host (default: g02, the hub)
-#   RDASH_REMOTE_ROOT   checkout on that host (default: g02's service-only ~/rdash/research)
+#   RDASH_HOST          ssh host: the team's hub (required; ~/.config/rdash/env)
+#   RDASH_REMOTE_ROOT   the team repository's checkout on that host (required)
 #   RDASH_SSH_HOSTS     GPU hosts the board may inspect, comma-separated
 #                       (default: the remote launcher's own default)
 #   RESEARCH_DASH_PORT  port, used on BOTH ends (default: 8766)
@@ -28,12 +28,13 @@ source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/rdash_env.sh"
 # answers, and a command routed through it hangs until keepalive gives up.
 set -eu
 
-HOST=${RDASH_HOST:-g02}
-ROOT=${RDASH_REMOTE_ROOT:-/home/hanson/rdash/research}
+HOST=${RDASH_HOST:-}
+ROOT=${RDASH_REMOTE_ROOT:-}
+[ -n "$HOST" ] && [ -n "$ROOT" ] || { echo "rdash_remote.sh: set RDASH_HOST and RDASH_REMOTE_ROOT (~/.config/rdash/env)" >&2; exit 1; }
 PORT=${RESEARCH_DASH_PORT:-8766}
 FORWARD="${PORT}:127.0.0.1:${PORT}"
 URL="http://127.0.0.1:${PORT}"
-REMOTE="$ROOT/dashboard/app/research_dash.sh"
+REMOTE="$ROOT/rdash/dashboard/app/research_dash.sh"
 CTL="${TMPDIR:-/tmp}/rdash-tunnel-${HOST}-${PORT}.sock"
 WATCH="${TMPDIR:-/tmp}/rdash-watch-${HOST}-${PORT}.pid"
 ONESHOT="-o ControlPath=none -o ConnectTimeout=10"

@@ -25,7 +25,7 @@ PRs only; tests must pass:
 
 ```bash
 python3 -m unittest discover -s dashboard/tests -t .
-python3 -m unittest discover -s probe/tests -t .
+(cd probe && python3 -m unittest discover -s tests)
 ```
 
 Seeded 2026-11-08 from `dw-research` by its exporter (history-free). The `SHARED_FROM.json`

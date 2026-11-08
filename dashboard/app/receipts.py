@@ -7,7 +7,7 @@ submission produces -- job ID, host, code commit, staged scripts, output folder
     <runs root>/<project>/receipts/<job>.json      rsub / launch.py
     <runs root>/focus/receipts/<job>.json          fsubmit (names its F-id)
 
-The hub (g02) only reads. `collect` copies new receipts over SSH into its board
+The hub only reads. `collect` copies new receipts over SSH into its board
 checkout as projects/<project>/runs/<host>-<job>.json (unique names, so they
 never conflict in git); the board joins them to cards by `card`, and the sync
 commits them. Nothing has to reach the hub, and a hub outage loses nothing: the

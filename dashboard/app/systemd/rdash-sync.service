@@ -1,0 +1,14 @@
+[Unit]
+Description=rdash sync for TEAM_REPO: collect receipts, commit board writes, follow origin/main
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/TEAM_REPO
+Environment=RDASH_HOST_ALIAS=HUB_ALIAS
+Environment=RDASH_SSH_HOSTS=GPU_HOST
+Environment=RDASH_SLOW_HOSTS=GPU_HOST:900
+Environment=RDASH_CONFIG_DIR=/home/USER/.config/rdash/config
+Environment=RESEARCH_DASH_CACHE=/home/USER/.cache/rdash-TEAM_REPO
+ExecStart=%h/TEAM_REPO/rdash/dashboard/app/rdash_sync.sh
+TimeoutStartSec=240

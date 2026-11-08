@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# rdash_sync.sh — the hub's one-minute loop (dwos-rdash-sync.timer on g02).
+# rdash_sync.sh — the hub's one-minute loop (the team repo's rdash sync timer; dashboard/app/systemd/).
 #
 #   1. collect new run receipts from the launch hosts (receipts.py collect);
 #   2. commit what rdash itself wrote -- projects/*/cards (board edits, ideas,
@@ -20,10 +20,14 @@
 set -uo pipefail
 here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 source "$here/rdash_env.sh"
-root=$(cd -- "$here/../.." && pwd)
+tool=$(cd -- "$here/../.." && pwd)
+root=$tool
+# rdash as a submodule: the team repository that owns projects/ is one level up.
+[ -d "$root/projects" ] || root=$(cd -- "$root/.." && pwd)
 cd "$root" || exit 1
-export RDASH_REPO_ROOT=$root RDASH_HOST_ALIAS=${RDASH_HOST_ALIAS:-$(hostname -s)} RDASH_SSH_HOSTS=${RDASH_SSH_HOSTS-cajal,bc}
-cache=${RESEARCH_DASH_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/dw-research-dashboard}
+export PYTHONPATH=$tool${PYTHONPATH:+:$PYTHONPATH}
+export RDASH_REPO_ROOT=$root RDASH_HOST_ALIAS=${RDASH_HOST_ALIAS:-$(hostname -s)} RDASH_SSH_HOSTS=${RDASH_SSH_HOSTS-}
+cache=${RESEARCH_DASH_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/rdash-$(basename "$root")}
 mkdir -p "$cache"
 report() {
     python3 - "$cache/sync.json" "$1" "$2" "$(git rev-parse --short HEAD 2>/dev/null)" <<'PY'
@@ -93,7 +97,7 @@ fi
 changed=$(git ls-files -z --modified --deleted --others --exclude-standard -- "${OWNED[@]}" | tr '\0' '\n' | sort -u)
 if [ -n "$changed" ]; then
     printf '%s\n' "$changed" | git add -A --pathspec-from-file=- \
-        && git commit -q -m "rdash: board edits and run receipts (g02 sync)" \
+        && git commit -q -m "rdash: board edits and run receipts ($(hostname -s) sync)" \
         || { report warn "commit failed"; exit 1; }
 fi
 if ! git rebase -q origin/main >/dev/null 2>&1; then

@@ -1,0 +1,24 @@
+[Unit]
+Description=rdash board for TEAM_REPO
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/TEAM_REPO
+Environment=RDASH_REPO_ROOT=%h/TEAM_REPO
+Environment=RDASH_HOST=HUB_ALIAS
+Environment=RDASH_HOST_ALIAS=HUB_ALIAS
+Environment=RDASH_REMOTE_ROOT=/home/USER/TEAM_REPO
+Environment=RDASH_SSH_HOSTS=GPU_HOST
+Environment=RDASH_CONFIG_DIR=/home/USER/.config/rdash/config
+Environment=RDASH_OWNER=GITHUB_HANDLE
+Environment=RESEARCH_DASH_PORT=8766
+Environment=RESEARCH_DASH_CACHE=/home/USER/.cache/rdash-TEAM_REPO
+ExecStart=/usr/bin/python3 -B %h/TEAM_REPO/rdash/dashboard/app/rdash_service.py
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=25
+
+[Install]
+WantedBy=default.target

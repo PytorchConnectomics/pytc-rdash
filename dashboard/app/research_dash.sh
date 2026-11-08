@@ -6,12 +6,12 @@ export RDASH_SCRIPT_DIR
 
 # Live inspection defaults. Without a permitted host the board can declare a
 # job or a result but never observe one, so every card reads `unknown` and the
-# columns look broken when they are merely unwired. This fallback (`bc`) dates
-# from cajal's repair; `hub.sh` passes `cajal,bc` to the hub's board (g02). The roots it may read
-# are pinned in projects/config/rdash-roots.yaml, and a host listed here without an entry there still reads nothing.
-# Override by exporting RDASH_SSH_HOSTS before calling, including to "" for a
-# board that touches no remote host.
-: "${RDASH_SSH_HOSTS=bc}"
+# columns look broken when they are merely unwired. rdash ships no host: the
+# team's systemd unit, ~/.config/rdash/env or `hub.sh` exports RDASH_SSH_HOSTS,
+# and the roots it may read are pinned in the team's projects/config/rdash-roots.yaml
+# (a host listed without an entry there still reads nothing). Unset, the board
+# touches no remote host.
+: "${RDASH_SSH_HOSTS=}"
 export RDASH_SSH_HOSTS
 exec python3 -B - "$@" <<'PY'
 import fcntl

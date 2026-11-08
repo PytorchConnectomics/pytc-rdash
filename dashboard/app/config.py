@@ -77,16 +77,30 @@ class Settings:
     def local_enabled(self):
         return self.stat_local or bool(self.host_alias)
 
+    @staticmethod
+    def default_root():
+        """The repository whose projects/ the board reads when RDASH_REPO_ROOT is unset.
+
+        rdash itself holds no projects. Run as a submodule of a team repository
+        (<team>/rdash/dashboard/app/config.py) the team repository is one level
+        above the tooling checkout; a checkout that carries its own projects/
+        (the test fixtures) is used as is.
+        """
+        own = Path(__file__).resolve().parents[2]
+        if not (own / "projects").is_dir() and (own.parent / "projects").is_dir():
+            return own.parent
+        return own
+
     @classmethod
     def from_env(cls, env=None, port=None):
         env = os.environ if env is None else env
-        root = Path(env.get("RDASH_REPO_ROOT", Path(__file__).resolve().parents[2])).resolve()
+        root = Path(env["RDASH_REPO_ROOT"]).resolve() if "RDASH_REPO_ROOT" in env else cls.default_root()
         if not (root / "projects").is_dir():
-            raise ValueError("Repository must contain projects/")
+            raise ValueError("Repository must contain projects/: set RDASH_REPO_ROOT to the team repository that consumes rdash")
         home = Path(env.get("HOME", str(Path.home())))
         default = (home / "Library/Caches" if sys.platform == "darwin" else
                    Path(env.get("XDG_CACHE_HOME", home / ".cache")))
-        cache = Path(env.get("RESEARCH_DASH_CACHE", default / "dw-research-dashboard")).expanduser().absolute()
+        cache = Path(env.get("RESEARCH_DASH_CACHE", default / ("rdash-" + root.name))).expanduser().absolute()
         value = int(port if port is not None else env.get("RESEARCH_DASH_PORT", 8766))
         if not 0 <= value <= 65535:
             raise ValueError("Port must be between 0 and 65535")

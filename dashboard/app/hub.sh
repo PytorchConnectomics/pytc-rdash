@@ -12,26 +12,33 @@ source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/rdash_env.sh"
 #   hub.sh jobs [gpu-host]                          your queued/running Slurm jobs
 #
 # Topology (dashboard/RECEIPTS.md): cards live in git and are written anywhere. The
-# board runs on the hub (g02) in a service-only checkout that follows origin/main
-# every minute and commits what the board writes. A launch submits from the
-# machine that holds the code (rsub) and leaves a receipt beside the run; the hub
-# collects receipts and never edits a card to record a job. This machine only
-# opens the tunnel (`rdash`); cluster keys stay on the hub.
+# board runs on the team's hub in a service-only checkout of the team repository
+# (with rdash/ as its submodule) that follows origin/main every minute and commits
+# what the board writes. A launch submits from the machine that holds the code
+# (rsub) and leaves a receipt beside the run; the hub collects receipts and never
+# edits a card to record a job. This machine only opens the tunnel (`rdash`);
+# cluster keys stay on the hub.
 #
-#   RDASH_HOST         hub ssh alias            (default: g02)
-#   RDASH_REMOTE_ROOT  hub research checkout    (default: /home/hanson/rdash/research)
-#   RDASH_SSH_HOSTS    GPU hosts, comma list    (default: cajal,bc; cajal back 2026-10-07)
-#   RDASH_GPU_ROOT     GPU hosts' checkout      (default: /home/donglai/dw-os/research)
-#   RDASH_CHECKOUT_HOSTS  GPU hosts with that checkout, where launches run (default: cajal);
-#                      a host without one (bc) is staged from the hub over SSH
+# rdash ships no hosts or paths: each team sets them in ~/.config/rdash/env
+# (rdash_env.sh) or its systemd units (dashboard/app/systemd/).
+#   RDASH_HOST         hub ssh alias                           (required)
+#   RDASH_REMOTE_ROOT  the team repository's checkout on the hub (required)
+#   RDASH_SSH_HOSTS    GPU hosts, comma list                   (default: none)
+#   RDASH_GPU_ROOT     the team repository's checkout on GPU hosts that have one
+#   RDASH_CHECKOUT_HOSTS  GPU hosts with that checkout, where launches run;
+#                      any other GPU host is staged from the hub over SSH
 set -eu
 
-HUB=${RDASH_HOST-g02}
-HUB_ROOT=${RDASH_REMOTE_ROOT-/home/hanson/rdash/research}
-GPUS=${RDASH_SSH_HOSTS-cajal,bc}
-GPU_ROOT=${RDASH_GPU_ROOT-/home/donglai/dw-os/research}
-CHECKOUTS=${RDASH_CHECKOUT_HOSTS-cajal}
+HUB=${RDASH_HOST-}
+HUB_ROOT=${RDASH_REMOTE_ROOT-}
+GPUS=${RDASH_SSH_HOSTS-}
+GPU_ROOT=${RDASH_GPU_ROOT-}
+CHECKOUTS=${RDASH_CHECKOUT_HOSTS-}
+[ -n "$HUB" ] && [ -n "$HUB_ROOT" ] || { echo "hub.sh: set RDASH_HOST and RDASH_REMOTE_ROOT (~/.config/rdash/env)" >&2; exit 1; }
+case "$HUB_ROOT$GPU_ROOT" in *[!A-Za-z0-9._/-]*) echo "hub.sh: invalid checkout path" >&2; exit 1 ;; esac
 HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+# From the team repository, the tooling is rdash/; python modules import as dashboard.*
+TOOL=rdash
 ENV="RDASH_SSH_HOSTS=$GPUS RDASH_HOST_ALIAS=$HUB"
 for key in RDASH_CONFIG_DIR RESEARCH_DASH_PORT; do
     if declare -p "$key" >/dev/null 2>&1; then
@@ -44,7 +51,7 @@ for value in "$HUB" $(echo "$GPUS" | tr ',' ' '); do
     case "$value" in ''|-*|*[!A-Za-z0-9._-]*) echo "hub.sh: invalid host '$value'" >&2; exit 1 ;; esac
 done
 
-# On the hub itself (an agent session on g02), run hub commands locally.
+# On the hub itself (an agent session there), run hub commands locally.
 LOCAL=$(hostname -s 2>/dev/null || hostname)
 on() {
     host=$1; shift
@@ -99,9 +106,9 @@ pull() {
 case "${1:-}" in
 status)
     printf 'local: %s  %s\n' "$(git -C "$HERE" log --oneline -1)" "$(git -C "$HERE" status -sb | head -1)"
-    on "$HUB" "cd $HUB_ROOT && echo \"$HUB: \$(git log --oneline -1)\" && { b=\$(git symbolic-ref -q --short HEAD) || b=; [ \"\$b\" = main ] || echo \"  WARNING: board checkout is on '\${b:-detached HEAD}', not main: it serves that, and the sync is blocked\"; } && git status --short | head -5 && $ENV dashboard/app/research_dash.sh status && { cat \${XDG_CACHE_HOME:-\$HOME/.cache}/dw-research-dashboard/sync.json 2>/dev/null | sed 's/^/sync: /' || echo 'sync: never ran (enable dwos-rdash-sync.timer)'; echo; }"
+    on "$HUB" "cd $HUB_ROOT && echo \"$HUB: \$(git log --oneline -1)\" && { b=\$(git symbolic-ref -q --short HEAD) || b=; [ \"\$b\" = main ] || echo \"  WARNING: board checkout is on '\${b:-detached HEAD}', not main: it serves that, and the sync is blocked\"; } && git status --short | head -5 && $ENV $TOOL/dashboard/app/research_dash.sh status && { cat \${RESEARCH_DASH_CACHE:-\${XDG_CACHE_HOME:-\$HOME/.cache}/rdash-\$(basename $HUB_ROOT)}/sync.json 2>/dev/null | sed 's/^/sync: /' || echo 'sync: never ran (enable the rdash sync timer)'; echo; }"
     for g in $(echo "$GPUS" | tr ',' ' '); do
-        on_gpu "$g" "{ cd $GPU_ROOT 2>/dev/null && echo \"$g: \$(git log --oneline -1)\"; } || echo \"$g: no research checkout (launch does not need one)\"; squeue --me -h -o '  %i %j %T %M' | head -20"
+        on_gpu "$g" "{ [ -n '$GPU_ROOT' ] && cd $GPU_ROOT 2>/dev/null && echo \"$g: \$(git log --oneline -1)\"; } || echo \"$g: no team checkout (launch does not need one)\"; squeue --me -h -o '  %i %j %T %M' | head -20"
     done
     if tunnel; then
         if "$HERE/rdash_remote.sh" status 2>/dev/null | grep -q 'tunnel: up'; then echo "tunnel: up"
@@ -113,8 +120,8 @@ deploy)
         echo "hub.sh: local commits are not pushed; push first" >&2; exit 1
     fi
     pull "$HUB" "$HUB_ROOT"
-    for g in $(echo "$GPUS" | tr ',' ' '); do pull "$g" "$GPU_ROOT"; done
-    on "$HUB" "cd $HUB_ROOT && $ENV dashboard/app/research_dash.sh stop >/dev/null; $ENV dashboard/app/research_dash.sh start"
+    [ -z "$GPU_ROOT" ] || for g in $(echo "$CHECKOUTS" | tr ',' ' '); do pull "$g" "$GPU_ROOT"; done
+    on "$HUB" "cd $HUB_ROOT && $ENV $TOOL/dashboard/app/research_dash.sh stop >/dev/null; $ENV $TOOL/dashboard/app/research_dash.sh start"
     if tunnel; then "$HERE/rdash_remote.sh" start >/dev/null && echo "tunnel: up"; fi
     ;;
 launch)
@@ -136,18 +143,20 @@ launch)
         esac
         shift
     done
-    repo=$(cd "$HERE/../.." && pwd)
+    tool=$(cd "$HERE/../.." && pwd); repo=$tool
+    [ -d "$repo/projects" ] || repo=$(cd "$repo/.." && pwd)   # rdash as a submodule: the team repo is one level up
     git -C "$repo" fetch -q origin main || { echo "hub.sh: could not fetch origin/main" >&2; exit 1; }
-    host=$(cd "$repo" && RDASH_SSH_HOSTS= python3 -B -m dashboard.app.launch --project "$project" --card "$card" --ref origin/main$step --print-host) || exit 1
-    run="git fetch -q origin main && dashboard/bin/rsub $project $card --ref origin/main$step$extra"
+    host=$(cd "$repo" && PYTHONPATH=$tool RDASH_SSH_HOSTS= python3 -B -m dashboard.app.launch --project "$project" --card "$card" --ref origin/main$step --print-host) || exit 1
+    run="git fetch -q origin main && $TOOL/dashboard/bin/rsub $project $card --ref origin/main$step$extra"
     case ",$CHECKOUTS," in
-    *",$host,"*) on_gpu_strict "$host" "cd $GPU_ROOT && $run" ;;
+    *",$host,"*) [ -n "$GPU_ROOT" ] || { echo "hub.sh: RDASH_GPU_ROOT is unset for checkout host $host" >&2; exit 1; }
+                 on_gpu_strict "$host" "cd $GPU_ROOT && $run" ;;
     *) on_strict "$HUB" "cd $HUB_ROOT && $run" ;;
     esac
     ;;
 runs)
     [ -z "${2:-}" ] || case "$2" in *[!A-Za-z0-9._-]*) echo "hub.sh: invalid project" >&2; exit 1 ;; esac
-    on_strict "$HUB" "cd $HUB_ROOT && $ENV python3 -B -m dashboard.app.receipts unrecorded${2:+ --project $2}"
+    on_strict "$HUB" "cd $HUB_ROOT && $ENV PYTHONPATH=$TOOL python3 -B -m dashboard.app.receipts unrecorded${2:+ --project $2}"
     ;;
 attach)
     usage="usage: hub.sh attach <host> <job> <project> [cards/file.md] [--note TEXT]"
@@ -156,10 +165,10 @@ attach)
     args=(--host "$1" --job "$2" --project "$3"); shift 3
     if [ $# -gt 0 ] && [ "$1" != --note ]; then args+=(--card "$1"); shift; fi
     if [ $# -gt 0 ]; then [ "$1" = --note ] && [ $# -eq 2 ] || { echo "$usage" >&2; exit 1; }; args+=(--note "$2"); fi
-    on_strict "$HUB" "cd $HUB_ROOT && $ENV python3 -B -m dashboard.app.receipts attach$(printf ' %q' "${args[@]}")"
+    on_strict "$HUB" "cd $HUB_ROOT && $ENV PYTHONPATH=$TOOL python3 -B -m dashboard.app.receipts attach$(printf ' %q' "${args[@]}")"
     ;;
 sync)
-    on_strict "$HUB" "cd $HUB_ROOT && $ENV dashboard/app/rdash_sync.sh"
+    on_strict "$HUB" "cd $HUB_ROOT && $ENV $TOOL/dashboard/app/rdash_sync.sh"
     ;;
 batch)
     # hub.sh batch new <project> --name N --date D --set k=v ...
@@ -175,7 +184,7 @@ batch)
         case "$1" in *[!A-Za-z0-9._/-]*) echo "hub.sh: invalid card" >&2; exit 1 ;; esac
         set -- --card "$@"
     fi
-    on_strict "$HUB" "cd $HUB_ROOT && $ENV python3 -B -m dashboard.app.batch $cmd --project $project$(printf ' %q' "$@")"
+    on_strict "$HUB" "cd $HUB_ROOT && $ENV PYTHONPATH=$TOOL python3 -B -m dashboard.app.batch $cmd --project $project$(printf ' %q' "$@")"
     ;;
 jobs)
     for g in $(echo "${2:-$GPUS}" | tr ',' ' '); do

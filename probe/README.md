@@ -50,7 +50,7 @@ checkout, or `dw-os/research/`:
 
 ```bash
 mkdir -p ~/.claude/skills
-ln -s "$PWD/probe" ~/.claude/skills/probe
+ln -s "$PWD/rdash/probe" ~/.claude/skills/probe
 ```
 
 The destination must not already exist. Inspect and update an existing link
@@ -140,7 +140,7 @@ The delegated-step launcher accepts a **prompt filename** or `-` for stdin.
 Invoke its absolute path from the intended code workspace:
 
 ```bash
-/path/to/dw-research/probe/scripts/probe-run-agent.sh claude /path/to/prompt.md /path/to/final.md
+/path/to/<workbench>/rdash/probe/scripts/probe-run-agent.sh claude /path/to/prompt.md /path/to/final.md
 ```
 
 Use `codex` instead of `claude` for the other launcher backend. It inherits the

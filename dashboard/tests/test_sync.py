@@ -2,12 +2,14 @@
 import json
 import os
 import shutil
+import socket
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
 SOURCE = Path(__file__).resolve().parents[2]
+HOST = socket.gethostname().split(".")[0]  # what `hostname -s` prints
 
 
 def git(repo, *args):
@@ -61,7 +63,7 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(git(self.board, "status", "--porcelain"), "")
         self.assertTrue((self.board / "projects/alpha/cards/new.md").is_file())
         log = git(self.origin, "log", "--format=%s", "main")
-        self.assertIn("rdash: board edits and run receipts (g02 sync)", log)
+        self.assertIn("rdash: board edits and run receipts (%s sync)" % HOST, log)
         self.assertIn("peer card", log)
         self.assertEqual(git(self.origin, "show", "main:projects/alpha/cards/q.md"), "card v2 (board edit)")
 
@@ -92,7 +94,7 @@ class SyncTests(unittest.TestCase):
         (self.board / "projects/alpha/cards/q.md").write_text("board edit\n")
         result, state = self.sync()
         self.assertEqual(state["state"], "conflict")
-        self.assertEqual(git(self.board, "log", "--format=%s", "-1"), "rdash: board edits and run receipts (g02 sync)")
+        self.assertEqual(git(self.board, "log", "--format=%s", "-1"), "rdash: board edits and run receipts (%s sync)" % HOST)
         self.assertEqual(git(self.origin, "log", "--format=%s", "-1", "main"), "peer edit")
 
     def test_a_host_that_drops_out_warns_until_it_is_back_or_removed(self):
