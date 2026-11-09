@@ -28,5 +28,4 @@ python3 -m unittest discover -s dashboard/tests -t .
 (cd probe && python3 -m unittest discover -s tests)
 ```
 
-Seeded 2026-11-08 from `dw-research` by its exporter (history-free). The `SHARED_FROM.json`
-marker records the source revision; it is informational once this repository is canonical.
+This repository is canonical: changes land here by PR and reach each team repository on its next submodule bump.
