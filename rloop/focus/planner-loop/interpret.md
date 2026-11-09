@@ -20,3 +20,8 @@ supported | not supported | inconclusive | invalid run — one line on why
 
 ## Next iteration seed
 <!-- The one change the next plan should test, and why this evidence points there. -->
+
+## Needs you
+<!-- Only if a person owes a decision before the next plan. One to three numbered options, ranked,
+     then `Recommendation:`; copy the block to the notebook and set its frontmatter `state: needs-you`.
+     If nothing is owed, delete this section and leave the notebook `state: working`. -->

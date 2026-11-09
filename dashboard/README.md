@@ -42,6 +42,14 @@ top-level `tasks` list in the fence fixes the project's task columns and their o
 Stages are `idea`, `formulating`, `probing`, `reviewing`, and `parked`.
 Card stage is distinct from job status, measurement validity, and scientific verdict.
 
+Optional `state:` is the one signal an agent thread declares (`working`, `needs-you`,
+`paused`, `done`; `dashboard/app/needs_you.py`). `needs-you` is the bell: it is read
+before any inferred owner, and it is valid only with a `## Needs you` section of one to
+three numbered options and a `Recommendation:` line (template). Focus notebooks
+(`projects/<p>/focus/F-*.md`) carry the same field. Across checkouts,
+`python3 -m rdash.dashboard.app.needs_you <workbench roots...> [--write status.json]`
+lists what needs a person without a second board; keep the written file git-ignored.
+
 Cards are entry points for ideas and evidence, not duplicate experiment ledgers.
 Link accepted plans, results, and lessons in their existing canonical locations.
 Preserve original predictions and append human guidance and proposed revisions.
