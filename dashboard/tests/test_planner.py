@@ -32,8 +32,9 @@ class PlannerTests(RepoTest):
         # the board's own ladder view reads the same file, root LADDER.md only as the older location
         self.assertEqual(len(ladder.read(self.settings)["rows"]), 9)
         html = planner.render_ladder(self.settings, self.today)
-        for needle in ("Oct 2026", 'class="lmon now">Nov 2026', "May 2027", 'class="g met"', "plan/sprint-b.md", "--n:9"):
+        for needle in ("Oct 2026", 'class="lmon now">Nov 2026', "May 2027", 'class="g met"', "plan/sprint-b.md", 'data-n="9"'):
             self.assertIn(needle, html)
+        self.assertNotIn("style=", html)   # the CSP blocks inline style attributes; the grid collapsed to one column once
 
     def test_day_file_parse_toggle_delete_and_create(self):
         self.assertFalse(planner.read_plan(self.settings, DAY)["exists"])
