@@ -1,0 +1,2 @@
+{"cause": ["nccl_p2p_hang"], "action": ["retry_with_fix"], "notify": true,
+ "reference_fix": "Cancel, resubmit with NCCL_P2P_DISABLE=1 (passes via host memory); tell DW the real fix is iommu=pt, which needs a reboot."}
