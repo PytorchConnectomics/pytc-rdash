@@ -36,28 +36,49 @@ class PlannerTests(RepoTest):
             self.assertIn(needle, html)
         self.assertNotIn("style=", html)   # the CSP blocks inline style attributes; the grid collapsed to one column once
 
-    def test_rung_deliverables_are_a_checklist_edited_in_the_ladder_file(self):
+    def test_rung_deliverables_are_grouped_tagged_and_edited_in_the_ladder_file(self):
         shutil.copyfile(FIXTURES / "LADDER.md", self.repo / "plan/LADDER.md")
         text = (self.repo / "plan/LADDER.md").read_text() + (
-            "\n## Deliverables\n\n### 2026-10 — 20 µm\n\n- [x] ran the cube\n  - note under it\n- [.] score it\n- [ ] write it up\n"
-            "\n### 2026-11 — 50 µm\n\n- [ ] decode\n\n### 2026-11 — 20 µm iteration\n\n- [x] iter-01\n\n## After\n\n- [ ] not a deliverable\n")
+            "\n## Deliverables\n\n### 2026-10 — 20 µm\n\n- [x] ran the cube #chem\n  - note under it\n- [.] score it\n"
+            "\n#### Explorative\n\n- [ ] write it up #optics #ephys\n"
+            "\n### 2026-11 — 50 µm\n\n- [ ] decode\n\n### 2026-11 — 20 µm iteration\n\n#### Shovel-ready\n\n- [x] iter-01\n\n## After\n\n- [ ] not a deliverable\n")
         (self.repo / "plan/LADDER.md").write_text(text)
         lad = planner.ladders(self.settings)[0]
         oct_ = lad["months"][(2026, 10)][0]["items"]
-        self.assertEqual([(i["state"], i["text"], i["sub"]) for i in oct_],
-                         [("done", "ran the cube", ["note under it"]), ("doing", "score it", []), ("todo", "write it up", [])])
+        self.assertEqual([(i["state"], i["clean"], i["group"], i["teams"], i["sub"]) for i in oct_],
+                         [("done", "ran the cube", "shovel", ["chem"], ["note under it"]), ("doing", "score it", "shovel", ["comp"], []),
+                          ("todo", "write it up", "explore", ["optics", "ephys"], [])])
         by_name = {r["rung"]: [i["text"] for i in r["items"]] for r in lad["months"][(2026, 11)]}
         self.assertEqual(by_name, {"20 µm iteration": ["iter-01"], "50 µm": ["decode"], "100 µm": []})
         self.assertEqual(lad["months"][(2026, 9)][0]["items"], [])
         html = planner.render_ladder(self.settings, self.today)
-        self.assertIn('<span class="dn">1 / 3</span>', html)
-        self.assertIn('<span class="gw">quality</span>', html)
-        self.assertIn('class="gate met"', html)
-        self.assertIn('data-path="plan/LADDER.md"', html)
+        for needle in ('<span class="dn">1 / 3</span>', 'class="g met">ran</span>', 'class="g open">quality</span>', 'class="gate met"',
+                       '<h5>shovel-ready</h5>', '<h5>explorative</h5>', 'select class="team t-chem"', 'class="chip t-ephys"',
+                       'data-text="write it up"', 'data-tags="#optics #ephys"', 'placeholder="+ explorative item"'):
+            self.assertIn(needle, html)
         self.assertNotIn("style=", html)
-        line = oct_[2]["line"]
-        self.assertEqual(planner.apply_edit(self.settings, "plan/LADDER.md", line, oct_[2]["orig"], "toggle"), "toggle: plan/LADDER.md:%d" % (line + 1))
-        self.assertIn("- [x] write it up", (self.repo / "plan/LADDER.md").read_text())
+        self.assertNotIn(">G1<", html)                      # gates are named in words, not codes
+        # edit keeps the checkbox and rewrites the text (tags ride along in the text)
+        line = oct_[1]["line"]
+        planner.apply_edit(self.settings, "plan/LADDER.md", line, oct_[1]["orig"], "edit", text="score   it well #meche")
+        self.assertIn("- [.] score it well #meche\n", (self.repo / "plan/LADDER.md").read_text())
+        with self.assertRaises(Error):
+            planner.apply_edit(self.settings, "plan/LADDER.md", line, "- [.] score it well #meche", "edit", text="two\nlines")
+        # add into an existing sub-block, into the untitled shovel run, and into a sub-block that has to be created
+        lad = planner.ladders(self.settings)[0]
+        blk = lad["months"][(2026, 10)][0]["block"]
+        planner.apply_edit(self.settings, "plan/LADDER.md", blk["anchors"]["explore"]["line"], blk["anchors"]["explore"]["orig"], "add", text="try X", group="explore")
+        planner.apply_edit(self.settings, "plan/LADDER.md", blk["line"], blk["orig"], "add", text="do Y", group="shovel")
+        lad = planner.ladders(self.settings)[0]
+        got = [(i["group"], i["clean"]) for i in lad["months"][(2026, 10)][0]["items"]]
+        self.assertEqual(got, [("shovel", "ran the cube"), ("shovel", "score it well"), ("shovel", "do Y"), ("explore", "write it up"), ("explore", "try X")])
+        blk = lad["months"][(2026, 11)][1]["block"] if lad["months"][(2026, 11)][1]["rung"] == "50 µm" else lad["months"][(2026, 11)][0]["block"]
+        planner.apply_edit(self.settings, "plan/LADDER.md", blk["line"], blk["orig"], "add", text="guess Z", group="explore")
+        body = (self.repo / "plan/LADDER.md").read_text()
+        self.assertIn("- [ ] decode\n\n#### Explorative\n\n- [ ] guess Z\n\n### 2026-11 — 20 µm iteration", body)
+        self.assertIn("- [ ] not a deliverable", body)
+        with self.assertRaises(Error):
+            planner.apply_edit(self.settings, "plan/LADDER.md", blk["line"], blk["orig"], "add", text="q", group="other")
         for bad in ("plan/../LADDER.md", "plan/sub/x.md", "LADDER.md", "plan/.hidden.md"):
             with self.assertRaises(Error):
                 planner.plan_path(self.settings, bad)

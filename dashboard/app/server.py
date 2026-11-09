@@ -170,7 +170,8 @@ def make_server(settings):
                     return self.send_data(200, goals.command(settings, data))
                 if path == "/api/plan/edit":
                     return self.send_data(200, dict(ok=True, message=planner.apply_edit(
-                        settings, data.get("path"), data.get("line"), data.get("orig"), data.get("op"))))
+                        settings, data.get("path"), data.get("line"), data.get("orig"), data.get("op"),
+                        text=data.get("text"), group=data.get("group"))))
                 if path == "/api/plan/new":
                     projects = data.get("projects", [])
                     if not isinstance(projects, list) or any(not isinstance(p, str) or "\n" in p or len(p) > 80 for p in projects):
