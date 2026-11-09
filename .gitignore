@@ -1,0 +1,4 @@
+# Python bytecode and test caches are build artifacts; never track them.
+__pycache__/
+*.py[cod]
+.pytest_cache/
