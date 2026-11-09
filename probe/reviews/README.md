@@ -49,5 +49,6 @@ settings. Preserve prior preregistrations and results.
 | [June 2026 research-agent review](2026-06-26-research-agent-review.md) | Historical evidence and proposals; its deployment claims describe that session |
 | [September 2026 method boundary and protocol revision](2026-09-09-method-boundary.md) | Adopted design changes for protocol v2; project adoption remains explicit |
 | [Executable checks and first evaluator connection](2026-09-15-executable-checks.md) | Read-only reference inspection, behavior fixtures, and a synthetic NERL evaluator regression connection; no scientific-method migration |
+| [Instruction chain A/B](2026-11-08-instruction-chain-ab.md) | Trial: one-screen workbench `CLAUDE.md` of invariants vs. the full procedural chain, judged on two receipts of one frozen plan; protocol unchanged |
 
 Related historical context: [June NISB retrospective](../../projects/nisb-base-26/retrospectives/2026-06-26/README.md).
