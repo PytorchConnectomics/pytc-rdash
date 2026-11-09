@@ -28,6 +28,10 @@
       if (cur) s.scrollBy({left: parseInt(t.dataset.dir, 10) * cur.offsetWidth, behavior: "smooth"});
     }
   });
+  // The column count travels as data-n: an inline style attribute is blocked by the
+  // board's Content-Security-Policy, while setting the property from here is allowed.
+  var g = document.querySelector(".lgrid[data-n]");
+  if (g) g.style.setProperty("--n", g.dataset.n);
   var s = document.getElementById("lscroll"), cur = s && s.querySelector(".lmon.now");
   if (cur) s.scrollLeft = cur.offsetLeft - 150 - cur.offsetWidth;   // -1 | 0 | +1 in view
 })();

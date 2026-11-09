@@ -270,7 +270,7 @@ def render_ladder(settings, today=None):
             '<p class="legend">Gates: <span class="g met">met</span> <span class="g open">open</span> <span class="g failed">failed</span> '
             '<span class="g target">target</span> <span class="g none">—</span> · tags are read from each ladder file, never inferred; hover a gate for its text</p>'
             '<div class="lwrap"><button class="larr" data-dir="-1" title="earlier month">‹</button>'
-            '<div class="lscroll" id="lscroll"><div class="lgrid" style="--n:%d">%s</div></div>'
+            '<div class="lscroll" id="lscroll"><div class="lgrid" data-n="%d">%s</div></div>'
             '<button class="larr" data-dir="1" title="later month">›</button></div>%s'
             % (today.strftime("%a %m/%d"), len(lads), "s" if len(lads) != 1 else "", len(months), len(months), "".join(cells), "".join(notes)))
     return page("Plan · Ladder", "plan", "ladder", body, problems, "Rows: every plan/*.md with a ## Rungs table (one per sprint).")
