@@ -33,6 +33,10 @@ MODES = [("plan", "Plan", "/plan/ladder"), ("project", "Project", "/"), ("summar
 PLAN_SUBS = [("ladder", "Ladder", "/plan/ladder"), ("daily", "Daily", "/plan/daily"), ("weekly", "Weekly", "/plan/weekly")]
 NAME = re.compile(r"\d{4}-\d{2}-\d{2}\.md")
 MAX_FILE = 1048576
+TEAMS = ["comp", "chem", "optics", "meche", "ephys"]          # item tags: #chem … ; no tag means comp
+GROUPS = [("shovel", "shovel-ready"), ("explore", "explorative")]
+TAG = re.compile(r"(?:^|\s)#(" + "|".join(TEAMS) + r")\b")
+MAX_TEXT = 300
 
 
 # ---------- reading ----------
@@ -67,22 +71,45 @@ def _items(lines, start=0):
         if line.startswith("- "):
             mt = re.match(r"- \[([ xX.])\] (.*)", line)
             state = ({" ": "todo", ".": "doing"}.get(mt.group(1).lower(), "done")) if mt else "note"
-            items.append(dict(line=i, orig=line, text=mt.group(2) if mt else line[2:], state=state, sub=[]))
+            text = mt.group(2) if mt else line[2:]
+            teams = [t for t in TAG.findall(text)] or ["comp"]
+            items.append(dict(line=i, orig=line, text=text, clean=TAG.sub("", text).strip(), teams=teams,
+                              state=state, sub=[], group="shovel"))
         elif items and re.match(r"^\s+- ", line):
             items[-1]["sub"].append(re.sub(r"^\s+- (\[[ xX.]\] )?", "", line))
     return items
 
 
+def _group_of(heading):
+    h = heading.lower()
+    return "explore" if "explor" in h else "shovel" if "shovel" in h else h.strip() or "shovel"
+
+
 def read_deliverables(text):
-    """'## Deliverables' → {(year, month): [(heading, [item])]}: one '### YYYY-MM …' block per rung, in file order."""
+    """'## Deliverables' → {(year, month): [block]}, block = {'rung', 'line', 'orig', 'items', 'anchors'}: one
+    '### YYYY-MM — rung' block per rung, its items split by '#### Shovel-ready' / '#### Explorative' sub-headings
+    (items before any sub-heading are shovel-ready); anchors[group] is the sub-heading line for adding items."""
     out, lines = {}, text.split("\n")
     head = next((i for i, l in enumerate(lines) if l.rstrip() == "## Deliverables"), None)
     if head is None:
         return out
-    block, start = None, None
+    block = None
     def close(end):
-        if block:
-            out.setdefault(block[0], []).append((block[1], _items(lines[start:end], start)))
+        if block is None:
+            return
+        items, group, run_start = [], "shovel", block["line"] + 1
+        def flush(stop):
+            for it in _items(lines[run_start:stop], run_start):
+                it["group"] = group
+                items.append(it)
+        for j in range(block["line"] + 1, end):
+            if lines[j].startswith("#### "):
+                flush(j)
+                group, run_start = _group_of(lines[j][5:]), j + 1
+                block["anchors"][group] = dict(line=j, orig=lines[j].rstrip())
+        flush(end)
+        block["items"] = items
+        out.setdefault(block["ym"], []).append(block)
     for i in range(head + 1, len(lines) + 1):
         line = lines[i].rstrip() if i < len(lines) else "## "
         if line.startswith("## "):
@@ -91,7 +118,7 @@ def read_deliverables(text):
         m = re.match(r"### (\d{4})-(0[1-9]|1[0-2])\b\s*[—–-]?\s*(.*)", line)
         if m:
             close(i)
-            block, start = ((int(m.group(1)), int(m.group(2))), m.group(3).strip()), i + 1
+            block = dict(ym=(int(m.group(1)), int(m.group(2))), rung=m.group(3).strip(), line=i, orig=line, items=[], anchors={})
     return out
 
 
@@ -126,10 +153,10 @@ def read_ladder(path, rel):
         blocks = deliverables.get(ym, [])
         for row in rows:
             # a block names its rung ("### 2026-11 — 50 µm"); an unnamed block, or the month's only block, fits the month's only rung
-            hit = next((b for b in blocks if b[0] and b[0] in row.get("rung", "")), None)
+            hit = next((b for b in blocks if b["rung"] and b["rung"] in row.get("rung", "")), None)
             if hit is None and len(rows) == 1 and blocks:
                 hit = blocks[0]
-            row["items"] = hit[1] if hit else []
+            row["items"], row["block"] = (hit["items"], hit) if hit else ([], None)
     return lad
 
 
@@ -181,11 +208,11 @@ def read_plan(settings, rel):
             info["title"] = line[2:].strip()
         elif re.match(r"^#{2,3} ", line):
             level = len(line) - len(line.lstrip("#"))
-            sec = dict(name=line[level:].strip(), level=level, items=[])
+            sec = dict(name=line[level:].strip(), level=level, items=[], line=i, orig=line)
             info["sections"].append(sec)
         elif line.startswith("- "):
             if sec is None:
-                sec = dict(name="(no project)", level=2, items=[])
+                sec = dict(name="(no project)", level=2, items=[], line=None, orig="")
                 info["sections"].append(sec)
             sec["items"] += _items([line], i)
         elif sec and sec["items"] and re.match(r"^\s+- ", line):
@@ -224,7 +251,49 @@ def summary_path(settings, rel):
 
 # ---------- writing ----------
 
-def apply_edit(settings, rel, line, orig, op):
+def _item_text(text):
+    if not isinstance(text, str) or not text.strip() or "\n" in text or len(text) > MAX_TEXT:
+        raise Error(400, "invalid_text", "Item text must be one non-empty line of at most %d characters" % MAX_TEXT)
+    return " ".join(text.split())
+
+
+def _add_item(lines, anchor, group, text):
+    """Insert '- [ ] text' at the end of the item run that follows the anchor heading (or item). With a group and a
+    '### rung' anchor, the run is that group's '#### ' sub-block, created at the block's end when missing."""
+    if anchor + 1 < len(lines) and not lines[anchor].startswith("#") and not lines[anchor].startswith("- "):
+        raise Error(400, "bad_anchor", "Add under a heading or an item line")
+    if group and lines[anchor].startswith("### "):
+        end = anchor + 1
+        while end < len(lines) and not re.match(r"^#{1,3} ", lines[end]):
+            end += 1
+        subs = [j for j in range(anchor + 1, end) if lines[j].startswith("#### ")]
+        mine = [j for j in subs if _group_of(lines[j][5:]) == group]
+        if mine:
+            anchor = mine[0]
+        elif group == "shovel" and subs:
+            end = subs[0]                                   # the untitled run before the first sub-heading
+        else:
+            while end > anchor + 1 and not lines[end - 1].strip():
+                end -= 1
+            title = dict(GROUPS).get(group, group)
+            lines[end:end] = ["", "#### " + title[0].upper() + title[1:], "", "- [ ] " + text]
+            return end + 3
+    else:
+        end = anchor + 1
+        while end < len(lines) and not lines[end].startswith("#"):
+            end += 1
+    last = anchor
+    for j in range(anchor + 1, end):
+        if lines[j].strip():
+            last = j
+    if last == anchor and lines[anchor].startswith("#"):
+        lines[anchor + 1:anchor + 1] = ["", "- [ ] " + text]
+        return anchor + 2
+    lines[last + 1:last + 1] = ["- [ ] " + text]
+    return last + 1
+
+
+def apply_edit(settings, rel, line, orig, op, text=None, group=None):
     path = plan_path(settings, rel)
     with writer_lock(settings):
         if not path.exists():
@@ -232,7 +301,16 @@ def apply_edit(settings, rel, line, orig, op):
         lines = _text(path).split("\n")
         if type(line) is not int or not 0 <= line < len(lines) or not isinstance(orig, str) or lines[line].rstrip() != orig.rstrip():
             raise Error(409, "stale_line", "That line changed since the page loaded; reload and retry")
-        if op == "toggle":
+        if op == "edit":
+            m = re.match(r"^(\s*- (?:\[[ xX.]\] )?)(.*)$", lines[line])
+            if not m:
+                raise Error(400, "not_item", "Not an item line")
+            lines[line] = m.group(1) + _item_text(text)
+        elif op == "add":
+            if group is not None and group not in dict(GROUPS):
+                raise Error(400, "invalid_group", "group must be shovel or explore")
+            line = _add_item(lines, line, group, _item_text(text))
+        elif op == "toggle":
             m = re.match(r"^(\s*- \[)([ xX.])(\].*)$", lines[line])
             if not m:
                 raise Error(400, "not_checkbox", "Not a checkbox line")
@@ -244,7 +322,7 @@ def apply_edit(settings, rel, line, orig, op):
                 end += 1
             del lines[line:end]
         else:
-            raise Error(400, "invalid_op", "op must be toggle or delete")
+            raise Error(400, "invalid_op", "op must be toggle, delete, edit or add")
         publish_replace(path, "\n".join(lines).encode("utf-8"))
     return "%s: %s:%d" % (op, rel, line + 1)
 
@@ -309,12 +387,13 @@ def render_ladder(settings, today=None):
                      % (html.escape(lad["title"]), html.escape(lad["rel"]), gates))
         problems += ["%s: %s" % (lad["rel"], e) for e in lad["errors"]]
     body = ('<h1>%s · ladders by month · %d row%s, %d months (scroll sideways; ‹ › move one month)</h1>'
-            '<p class="legend">A rung is one month\'s deliverable; it passes when its three gates are met: '
-            '<b>G1 it ran</b> · <b>G2 quality</b> · <b>G3 cost</b> (each ladder\'s own gate table is under the grid). '
-            'Gate colours: <span class="g met">met</span> <span class="g open">open</span> <span class="g failed">failed</span> '
-            '<span class="g target">target</span> <span class="g none">—</span>, read from the ladder file, never inferred. '
-            'Below the gates, the rung\'s deliverables are a checklist (<span class="dot done"></span> done '
-            '<span class="dot doing"></span> in progress <span class="dot todo"></span> open) edited in place.</p>'
+            '<p class="legend">A rung is one month\'s deliverable. It passes when its three gates are met: '
+            '<b>ran</b> (end to end), <b>quality</b> (nERL at the bar) and <b>cost</b> (proofreader-minutes per mm); '
+            'each gate shows as a pill coloured by its state: <span class="g met">met</span> <span class="g open">open</span> '
+            '<span class="g failed">failed</span> <span class="g target">target</span> <span class="g none">not yet</span>, '
+            'read from the ladder file, never inferred (hover a gate for its full question; the gate table is under the grid). '
+            'Deliverables are <b>shovel-ready</b> (known recipe, just needs doing) or <b>explorative</b> (outcome unknown); '
+            'tick to mark done, click text to edit, the chip sets the team (comp unless tagged), type in the box to add.</p>'
             '<div class="lwrap"><button class="larr" data-dir="-1" title="earlier month">‹</button>'
             '<div class="lscroll" id="lscroll"><div class="lgrid" data-n="%d">%s</div></div>'
             '<button class="larr" data-dir="1" title="later month">›</button></div>%s'
@@ -337,20 +416,20 @@ def _gate_names(gates):
 
 
 def _rung_card(rel, r, names):
-    """One rung: header (name, data, overall state), one row per gate, then the deliverables checklist."""
+    """One rung: header (name, data, overall state), one row per gate named in words, then the deliverables
+    checklist split into shovel-ready and explorative, each with an add box."""
     states = [r[g]["state"] for g in ("g1", "g2", "g3")]
     overall = ("failed" if "failed" in states else "met" if states[0] == "met" and states[1] == "met" and states[2] in ("met", "none")
                else "open" if "met" in states or "open" in states else "target" if "target" in states else "none")
     rows = ""
     for g in ("g1", "g2", "g3"):
         word, question = names[g]
-        rows += ('<div class="gate %s" title="%s"><span class="g %s">%s</span><span class="gw">%s</span><span class="gt">%s</span></div>'
-                 % (r[g]["state"], html.escape(question, quote=True), r[g]["state"], g.upper(), html.escape(word),
-                    inline(r[g]["text"]) if r[g]["text"].strip() not in ("", "-", "—") else '<i class="none">no evidence yet</i>'))
-    items = r.get("items", [])
-    done = sum(1 for it in items if it["state"] == "done")
-    todo = ('<div class="dhead">deliverables <span class="dn">%d / %d</span></div><ul class="todo">%s</ul>'
-            % (done, len(items), "".join(_todo(rel, it) for it in items))) if items else ""
+        word = re.sub(r"^it\s+", "", word)
+        rows += ('<div class="gate %s" title="%s"><span class="g %s">%s</span><span class="gt">%s</span></div>'
+                 % (r[g]["state"], html.escape("%s — %s: %s (%s)" % (g.upper(), word, question, GATE_STATE[r[g]["state"]]), quote=True),
+                    r[g]["state"], html.escape(word),
+                    inline(r[g]["text"]) if r[g]["text"].strip() not in ("", "-", "—") else '<i class="none">not yet</i>'))
+    todo = _grouped(rel, r.get("items", []), r.get("block"))
     nb = r.get("notebook_question", "").strip()
     nb = '<div class="rnb">%s</div>' % inline(nb, links=True) if nb not in ("", "-", "—") else ""
     return ('<div class="rung %s"><div class="rtop"><b>%s</b><span class="rdata">%s</span><span class="g %s">%s</span></div>'
@@ -359,13 +438,43 @@ def _rung_card(rel, r, names):
                inline(r.get("status", "")), nb))
 
 
+def _add_box(rel, anchor, group, label):
+    if anchor is None or anchor.get("line") is None:
+        return ""
+    return ('<input class="addi" data-path="%s" data-line="%d" data-orig="%s"%s placeholder="+ %s" maxlength="%d">'
+            % (html.escape(rel, quote=True), anchor["line"], html.escape(anchor["orig"], quote=True),
+               (' data-group="%s"' % group) if group else "", html.escape(label, quote=True), MAX_TEXT))
+
+
+def _grouped(rel, items, block):
+    """The deliverables checklist of one rung: a count, then shovel-ready and explorative groups with add boxes."""
+    if block is None:
+        return ""
+    done = sum(1 for it in items if it["state"] == "done")
+    out = '<div class="dhead">deliverables <span class="dn">%d / %d</span></div>' % (done, len(items))
+    for key, label in GROUPS:
+        mine = [it for it in items if it["group"] == key]
+        anchor = block["anchors"].get(key) or dict(line=block["line"], orig=block["orig"])
+        out += ('<div class="grp %s"><h5>%s</h5><ul class="todo">%s</ul>%s</div>'
+                % (key, label, "".join(_todo(rel, it) for it in mine), _add_box(rel, anchor, key, label + " item")))
+    return out
+
+
 def _todo(rel, item):
+    """One checkbox line: tick to toggle, click the text to edit it, a team chip (comp by default), × to delete."""
     box = ('<input type="checkbox" data-op="toggle"%s>' % (" checked" if item["state"] == "done" else "")) if item["state"] != "note" else ""
     subs = "".join('<span class="sub">– %s</span>' % inline(s) for s in item["sub"])
-    return ('<li class="%s" data-path="%s" data-line="%d" data-orig="%s">%s<span class="txt">%s%s</span>'
+    teams = item.get("teams", ["comp"])
+    tags = " ".join("#" + t for t in teams if t != "comp")
+    select = '<select class="team t-%s" title="team">%s</select>' % (teams[0], "".join(
+        '<option value="%s"%s>%s</option>' % (t, " selected" if t == teams[0] else "", t) for t in TEAMS))
+    extra = "".join('<span class="chip t-%s">%s</span>' % (t, t) for t in teams[1:])
+    return ('<li class="%s" data-path="%s" data-line="%d" data-orig="%s" data-text="%s" data-tags="%s">%s'
+            '<span class="txt" title="click to edit">%s%s</span>%s%s'
             '<button class="del" data-op="delete" title="delete this item from %s">×</button></li>'
-            % (item["state"], html.escape(rel, quote=True), item["line"], html.escape(item["orig"], quote=True), box,
-               inline(item["text"]), subs, html.escape(rel, quote=True)))
+            % (item["state"], html.escape(rel, quote=True), item["line"], html.escape(item["orig"], quote=True),
+               html.escape(item.get("clean", item["text"]), quote=True), html.escape(tags, quote=True), box,
+               inline(item.get("clean", item["text"])), subs, select, extra, html.escape(rel, quote=True)))
 
 
 def _checklist(settings, info, title, nav, kind):
@@ -384,7 +493,7 @@ def _checklist(settings, info, title, nav, kind):
     projs, cur = [], None
     for s in info["sections"]:
         items = "".join(_todo(rel, i) for i in s["items"])
-        lst = ('<ul class="todo">%s</ul>' % items) if items else '<p class="empty">no items</p>'
+        lst = (('<ul class="todo">%s</ul>' % items) if items else "") + _add_box(rel, dict(line=s["line"], orig=s["orig"]), None, "add item")
         if s["level"] == 2 or cur is None:
             n = sum(i["state"] != "note" for i in s["items"])
             k = sum(i["state"] == "done" for i in s["items"])
@@ -392,7 +501,7 @@ def _checklist(settings, info, title, nav, kind):
             projs.append(cur)
         else:
             cur[0] += "<h4>%s</h4>%s" % (inline(s["name"]), lst)
-    body = (nav + '<h1>%s · %d/%d done · tick to mark done, × to delete the line from the file</h1><div class="projs">%s</div>%s'
+    body = (nav + '<h1>%s · %d/%d done · tick to mark done, click text to edit, × to delete, type in the box to add</h1><div class="projs">%s</div>%s'
             % (inline(info["title"] or ""), done, total, "".join(p[0] + "</div>" for p in projs),
                '<p class="empty">No items yet: add <code>- [ ] item</code> lines under a <code>## project</code> heading.</p>' if not projs else ""))
     return page(title, "plan", kind, body, (), rel)

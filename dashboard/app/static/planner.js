@@ -6,13 +6,40 @@
       .then(function (r) { return r.json().then(function (j) { if (!r.ok) alert(j.message || j.error || ("HTTP " + r.status)); location.reload(); }); })
       .catch(function (e) { alert("edit failed: " + e); });
   }
+  function edit(li, text) {   // the file line keeps its checkbox; team tags ride at the end of the text
+    var tags = li.dataset.tags ? " " + li.dataset.tags : "";
+    post("/api/plan/edit", {path: li.dataset.path, line: parseInt(li.dataset.line, 10), orig: li.dataset.orig, op: "edit", text: text + tags});
+  }
   document.addEventListener("change", function (ev) {
-    var box = ev.target; if (!box.matches || !box.matches("input[data-op=toggle]")) return;
-    var li = box.closest("li[data-path]"); if (!li) return;
-    post("/api/plan/edit", {path: li.dataset.path, line: parseInt(li.dataset.line, 10), orig: li.dataset.orig, op: "toggle"});
+    var el = ev.target; if (!el.matches) return;
+    var li = el.closest("li[data-path]"); if (!li) return;
+    if (el.matches("input[data-op=toggle]")) {
+      post("/api/plan/edit", {path: li.dataset.path, line: parseInt(li.dataset.line, 10), orig: li.dataset.orig, op: "toggle"});
+    } else if (el.matches("select.team")) {
+      li.dataset.tags = el.value === "comp" ? "" : "#" + el.value;
+      edit(li, li.dataset.text);
+    }
+  });
+  document.addEventListener("keydown", function (ev) {
+    var el = ev.target; if (!el.matches) return;
+    if (el.matches("input.addi")) {
+      if (ev.key !== "Enter" || !el.value.trim()) return;
+      post("/api/plan/edit", {path: el.dataset.path, line: parseInt(el.dataset.line, 10), orig: el.dataset.orig, op: "add",
+                              group: el.dataset.group || null, text: el.value.trim()});
+    } else if (el.matches("input.edit")) {
+      if (ev.key === "Enter" && el.value.trim()) edit(el.closest("li[data-path]"), el.value.trim());
+      else if (ev.key === "Escape") location.reload();
+    }
   });
   document.addEventListener("click", function (ev) {
     var t = ev.target; if (!t.matches) return;
+    var txt = t.closest(".txt");
+    if (txt && !t.closest("a") && txt.closest("li[data-path]") && !txt.closest("li").querySelector("input.edit")) {
+      var li = txt.closest("li"), inp = document.createElement("input");
+      inp.className = "edit"; inp.value = li.dataset.text; inp.maxLength = 300;
+      txt.replaceWith(inp); inp.focus(); inp.select();
+      return;
+    }
     if (t.matches("button[data-op=delete]")) {
       var li = t.closest("li[data-path]"); if (!li) return;
       if (!confirm("Delete this item from " + li.dataset.path + "?\n\n" + li.dataset.orig)) return;
