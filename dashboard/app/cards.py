@@ -5,6 +5,7 @@ import unicodedata
 from datetime import datetime, timezone
 
 from .jobs import declared_jobs, declared_steps
+from .needs_you import STATES, parse as needs_you_block
 from .projects import discover, get_project
 from .safety import (Error, agent_lock_state, backup, card_ref, publish_link,
                      publish_replace, resolve_within, writer_lock)
@@ -59,6 +60,8 @@ def parse(data, project):
         raise ValueError("Unknown stage")
     if "verdict" in metadata and metadata["verdict"] not in VERDICTS:
         raise ValueError("Unknown verdict")
+    if "state" in metadata and metadata["state"] not in STATES:
+        raise ValueError("Unknown state")
     if metadata["project"] != project:
         raise ValueError("Project differs from directory")
     return metadata, lines, positions, quotes, index
@@ -84,6 +87,8 @@ def _record(data, project, ref):
     record["owner"] = record["metadata"].get("owner", "")
     record["acceptance"] = acceptance(record["body"])
     record["verdict"] = record["metadata"].get("verdict")
+    record["state"] = record["metadata"].get("state")
+    record["needs_you"] = needs_you_block(record["body"]) if record["state"] == "needs-you" else None
     if record["metadata"].get("task") == "batch":
         record["steps"] = steps(record["body"])
         record["step_jobs"] = declared_steps(text)

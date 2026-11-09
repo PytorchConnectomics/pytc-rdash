@@ -3,6 +3,7 @@ import re
 from .projects import get_project
 from .safety import resolve_within
 from .questions import _frontmatter
+from .needs_you import STATES, parse as needs_you_block
 
 
 def read(settings, project):
@@ -25,5 +26,8 @@ def read(settings, project):
                 match = re.match(r'^\s*(?:[-*]|\d+\.) (?:\[([ xX])\]\s*)?(.*)', line)
                 if match:
                     items.append(dict(text=match.group(2), done=bool(match.group(1) and match.group(1).lower() == 'x')))
-        result.append(dict(id=path.stem, title=title.group(1) if title else '', owner=(meta or {}).get('owner', ''), decision=decision.group(1).strip() if decision else '', next=items, has_next=bool(section)))
+        state = (meta or {}).get('state', '')
+        result.append(dict(id=path.stem, title=title.group(1) if title else '', owner=(meta or {}).get('owner', ''), decision=decision.group(1).strip() if decision else '', next=items, has_next=bool(section),
+                           state=state if state in STATES else '', state_error=state if state and state not in STATES else '',
+                           needs_you=needs_you_block(body) if state == 'needs-you' else None))
     return dict(notebooks=result)

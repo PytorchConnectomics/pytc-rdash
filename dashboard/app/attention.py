@@ -1,4 +1,9 @@
-"""Route the next action. An agent owner is a suggestion, not dispatch authority."""
+"""Route the next action. An agent owner is a suggestion, not dispatch authority.
+
+A declared `state:` (needs_you.py) is read before anything is inferred: `needs-you`
+is the bell and rings only with a valid options block; `paused` and `done` are
+silent; `working` or no state falls through to the derivation below.
+"""
 
 # Mirrors JOB_BUCKET in static/app.js: the badge and this derivation must
 # read the same scheduler state the same way.
@@ -22,8 +27,15 @@ def owner_and_next(record):
     terminal = record.get("verdict") in ("met", "failed", "inconclusive")
     total, settled = acceptance.get("total", 0), acceptance.get("settled", 0)
     full = acceptance.get("declared", False) and settled == total and total > 0
+    state = record.get("state")
+    bell = record.get("needs_you") or {}
     rules = [
         (record.get("read_only"), "fix_frontmatter", "agent", "Inspect unsupported frontmatter before proposing a repair"),
+        (state == "needs-you" and not bell.get("valid"), "fix_needs_you", "agent",
+         "state is needs-you but the bell is malformed: " + "; ".join(bell.get("problems") or ["no block"])),
+        (state == "needs-you", "needs_you", "you", "Recommendation: " + bell.get("recommendation", "")),
+        (state == "paused", "paused", "none", "Parked by a person; no bell and no agent work until resumed"),
+        (state == "done" and not unresolved, "closed", "none", "Declared done; no unresolved execution state"),
         (contract.get("declared") and contract.get("structure") == "fail", "fix_contract", "agent", "Investigate unresolved contract references; preserve scientific criteria"),
         (contract.get("declared") and contract.get("structure") == "unknown", "contract_unknown", "agent", "Inspect why contract structure is unknown"),
         ((record.get("goal") or {}).get("phase") == "unknown", "unknown", "you", "Goal projection is unreadable or invalid; reconcile authority before continuing"),

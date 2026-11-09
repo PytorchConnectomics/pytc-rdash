@@ -4,6 +4,7 @@ title: Research question
 project: PROJECT
 track: model
 stage: idea
+state: working
 created: YYYY-MM-DD
 updated: YYYY-MM-DD
 ---
@@ -49,6 +50,17 @@ Job completion and artifact presence never establish acceptance or verdict.
 ## Next decision
 
 What evidence or human input would determine the next step?
+
+## Needs you
+
+Present only while frontmatter `state: needs-you`. One to three numbered options and
+a `Recommendation:` line; the board treats anything else as a malformed bell. A
+session stops in a waiting state only by writing this block; otherwise `state` is
+`working`, `paused` (parked by a person) or `done`.
+
+1. <option, one line, with what it costs>
+2. <option>
+Recommendation: <which one and why, one line>
 
 ## Optional live measurements
 

@@ -359,6 +359,9 @@ const OWNER_ORDER = {you: 0, agent: 1, scheduler: 2, none: 3};
 
 function attentionLabel(card) {
   const attention = card.attention || {};
+  if (attention.next === "needs_you") return "Needs you";
+  if (attention.next === "fix_needs_you") return "Malformed needs-you block";
+  if (attention.next === "paused") return "Paused";
   if (attention.owner === "agent") return attention.next === "in_session" && card.sessions?.running
     ? "Coordinator in flight" : "Agent can investigate";
   return {you: "Your decision", scheduler: "Waiting on scheduler", none: "Closed"}[attention.owner] || "Next action unknown";
@@ -973,6 +976,13 @@ function renderWeek(board) {
   for (const notebook of focusData.notebooks) {
     const selectedOwner = el("card-owner").value; if (selectedOwner && (selectedOwner === "__none__" ? notebook.owner : selectedOwner !== notebook.owner)) continue;
     const section = document.createElement("section"); const h = document.createElement("h2"); h.textContent = notebook.id + " · " + notebook.title; section.append(h);
+    const state = document.createElement("p"); state.className = "notebook-state state-" + (notebook.state || "unset");
+    state.textContent = "State: " + (notebook.state || (notebook.state_error ? "unknown value " + notebook.state_error : "not declared")); section.append(state);
+    if (notebook.needs_you) {
+      const bell = notebook.needs_you; const p = document.createElement("p");
+      p.textContent = bell.valid ? "Needs you — recommendation: " + bell.recommendation : "Needs you, but the block is malformed: " + bell.problems.join("; "); section.append(p);
+      const ol = document.createElement("ol"); for (const option of bell.options) { const li = document.createElement("li"); li.textContent = option; ol.append(li); } section.append(ol);
+    }
     const decision = document.createElement("p"); decision.textContent = "Decision needed: " + (notebook.decision || "—"); section.append(decision);
     const list = document.createElement("ul"); for (const item of notebook.next.filter(i => !i.done)) { const li = document.createElement("li"); li.textContent = item.text; list.append(li); } section.append(list);
     if (!notebook.has_next) { const p = document.createElement("p"); p.textContent = "no Next list"; section.append(p); } board.append(section);
