@@ -36,6 +36,32 @@ class PlannerTests(RepoTest):
             self.assertIn(needle, html)
         self.assertNotIn("style=", html)   # the CSP blocks inline style attributes; the grid collapsed to one column once
 
+    def test_rung_deliverables_are_a_checklist_edited_in_the_ladder_file(self):
+        shutil.copyfile(FIXTURES / "LADDER.md", self.repo / "plan/LADDER.md")
+        text = (self.repo / "plan/LADDER.md").read_text() + (
+            "\n## Deliverables\n\n### 2026-10 — 20 µm\n\n- [x] ran the cube\n  - note under it\n- [.] score it\n- [ ] write it up\n"
+            "\n### 2026-11 — 50 µm\n\n- [ ] decode\n\n### 2026-11 — 20 µm iteration\n\n- [x] iter-01\n\n## After\n\n- [ ] not a deliverable\n")
+        (self.repo / "plan/LADDER.md").write_text(text)
+        lad = planner.ladders(self.settings)[0]
+        oct_ = lad["months"][(2026, 10)][0]["items"]
+        self.assertEqual([(i["state"], i["text"], i["sub"]) for i in oct_],
+                         [("done", "ran the cube", ["note under it"]), ("doing", "score it", []), ("todo", "write it up", [])])
+        by_name = {r["rung"]: [i["text"] for i in r["items"]] for r in lad["months"][(2026, 11)]}
+        self.assertEqual(by_name, {"20 µm iteration": ["iter-01"], "50 µm": ["decode"], "100 µm": []})
+        self.assertEqual(lad["months"][(2026, 9)][0]["items"], [])
+        html = planner.render_ladder(self.settings, self.today)
+        self.assertIn('<span class="dn">1 / 3</span>', html)
+        self.assertIn('<span class="gw">quality</span>', html)
+        self.assertIn('class="gate met"', html)
+        self.assertIn('data-path="plan/LADDER.md"', html)
+        self.assertNotIn("style=", html)
+        line = oct_[2]["line"]
+        self.assertEqual(planner.apply_edit(self.settings, "plan/LADDER.md", line, oct_[2]["orig"], "toggle"), "toggle: plan/LADDER.md:%d" % (line + 1))
+        self.assertIn("- [x] write it up", (self.repo / "plan/LADDER.md").read_text())
+        for bad in ("plan/../LADDER.md", "plan/sub/x.md", "LADDER.md", "plan/.hidden.md"):
+            with self.assertRaises(Error):
+                planner.plan_path(self.settings, bad)
+
     def test_day_file_parse_toggle_delete_and_create(self):
         self.assertFalse(planner.read_plan(self.settings, DAY)["exists"])
         self.assertIn("Create it", planner.render_daily(self.settings, self.today, self.today))
