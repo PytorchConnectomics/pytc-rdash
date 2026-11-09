@@ -33,7 +33,7 @@ MODES = [("plan", "Plan", "/plan/ladder"), ("project", "Project", "/"), ("summar
 PLAN_SUBS = [("ladder", "Ladder", "/plan/ladder"), ("daily", "Daily", "/plan/daily"), ("weekly", "Weekly", "/plan/weekly")]
 NAME = re.compile(r"\d{4}-\d{2}-\d{2}\.md")
 MAX_FILE = 1048576
-TEAMS = ["comp", "chem", "optics", "meche", "ephys"]          # item tags: #chem … ; no tag means comp
+TEAMS = ["comp", "chem", "stain", "optics", "meche", "ephys"]   # item tags: #chem … ; no tag means comp
 GROUPS = [("shovel", "shovel-ready"), ("explore", "explorative")]
 TAG = re.compile(r"(?:^|\s)#(" + "|".join(TEAMS) + r")\b")
 MAX_TEXT = 300
@@ -393,7 +393,7 @@ def render_ladder(settings, today=None):
             '<span class="g failed">failed</span> <span class="g target">target</span> <span class="g none">not yet</span>, '
             'read from the ladder file, never inferred (hover a gate for its full question; the gate table is under the grid). '
             'Deliverables are <b>shovel-ready</b> (known recipe, just needs doing) or <b>explorative</b> (outcome unknown); '
-            'tick to mark done, click text to edit, the chip sets the team (comp unless tagged), type in the box to add.</p>'
+            'tick to mark done, click text to edit, the chip sets the team (comp unless tagged chem, stain, optics, meche or ephys), type in the box to add.</p>'
             '<div class="lwrap"><button class="larr" data-dir="-1" title="earlier month">‹</button>'
             '<div class="lscroll" id="lscroll"><div class="lgrid" data-n="%d">%s</div></div>'
             '<button class="larr" data-dir="1" title="later month">›</button></div>%s'

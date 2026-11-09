@@ -47,7 +47,7 @@ ul.todo .txt { cursor:text } ul.todo .txt:hover { text-decoration:underline dott
 select.team { appearance:none; -webkit-appearance:none; border:1px solid var(--line); border-radius:10px; padding:0 7px; font:inherit; font-size:10px; font-weight:600;
   line-height:16px; background:#e8eee8; color:var(--mute); cursor:pointer; align-self:center; flex:0 0 auto }
 .chip.t-chem, select.t-chem { background:#f3e1f7; color:#6e2a85; border-color:#d9b7e3 } .chip.t-optics, select.t-optics { background:#dcecfb; color:#1d4f87; border-color:#b4d0ee }
-.chip.t-meche, select.t-meche { background:#fbe9d0; color:#8a4a06; border-color:#eccf9f } .chip.t-ephys, select.t-ephys { background:#dff3e4; color:#1f6b3a; border-color:#b2dcbc }
+.chip.t-stain, select.t-stain { background:#fde3e3; color:#8c2525; border-color:#f0bdbd } .chip.t-meche, select.t-meche { background:#fbe9d0; color:#8a4a06; border-color:#eccf9f } .chip.t-ephys, select.t-ephys { background:#dff3e4; color:#1f6b3a; border-color:#b2dcbc }
 ul.todo .chip { font-size:10px; padding:0 7px; line-height:16px; align-self:center; flex:0 0 auto }
 .rstat { color:var(--mute); font-size:11px; margin-top:5px } .rnb { color:var(--mute); font-size:11px } .rnb a { color:var(--accent) }
 .dot { display:inline-block; width:9px; height:9px; border-radius:50%; border:1px solid var(--line); vertical-align:middle }
