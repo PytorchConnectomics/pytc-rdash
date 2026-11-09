@@ -144,8 +144,9 @@ class SubmoduleSyncTests(unittest.TestCase):
             subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(bare)], check=True)
         self.run_git(root, "clone", "-q", str(self.tool_origin), str(tool_src))
         self.run_git(tool_src, "checkout", "-q", "-B", "main")
-        shutil.copytree(SOURCE / "dashboard/app", tool_src / "dashboard/app",
-                        ignore=shutil.ignore_patterns("__pycache__"))
+        for package in ("app", "supervisor"):   # the server imports both, so a board can start from the fixture
+            shutil.copytree(SOURCE / "dashboard" / package, tool_src / "dashboard" / package,
+                            ignore=shutil.ignore_patterns("__pycache__"))
         (tool_src / "dashboard/__init__.py").write_text("")
         self.run_git(tool_src, "add", "-A")
         self.run_git(tool_src, "commit", "-qm", "tool v1")
@@ -192,6 +193,26 @@ class SubmoduleSyncTests(unittest.TestCase):
         self.assertEqual(self.run_git(self.board, "status", "--porcelain"), "")
         result, state = self.sync()     # and the next run is not blocked
         self.assertEqual(state["state"], "ok", result.stdout + result.stderr)
+
+    def test_a_pin_bump_stops_the_running_board_so_its_service_restarts(self):
+        with socket.socket() as probe:
+            probe.bind(("127.0.0.1", 0))
+            port = probe.getsockname()[1]
+        env = dict(self.env, RDASH_REPO_ROOT=str(self.board), RESEARCH_DASH_PORT=str(port))
+        launcher = str(self.board / "rdash/dashboard/app/research_dash.sh")
+        self.addCleanup(subprocess.run, [launcher, "stop"], env=env, capture_output=True, timeout=60)
+        started = subprocess.run([launcher, "start"], env=env, capture_output=True, text=True, timeout=60)
+        self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
+        self.assertTrue((self.cache / "rdash.pid").is_file())
+        self.bump_tool_pin_from_peer()
+        result, state = self.sync()
+        self.assertEqual(state["state"], "ok", result.stdout + result.stderr)
+        self.assertIn("board stopped so its service restarts", result.stdout)
+        self.assertFalse((self.cache / "rdash.pid").exists())
+        self.assertIn("stopped", subprocess.run([launcher, "status"], env=env, capture_output=True, text=True, timeout=60).stdout)
+        result, state = self.sync()     # with no board running there is nothing to stop
+        self.assertEqual(state["state"], "ok", result.stdout + result.stderr)
+        self.assertNotIn("board stopped", result.stdout)
 
     def test_a_board_already_behind_its_pin_heals(self):
         old = self.run_git(self.board / "rdash", "rev-parse", "HEAD")
