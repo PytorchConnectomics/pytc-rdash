@@ -59,8 +59,45 @@ def add_months(y, m, k):
     return yy, mm + 1
 
 
+def _items(lines, start=0):
+    """Checkbox items from a run of lines: {'line', 'orig', 'text', 'state': todo|doing|done|note, 'sub': [text]}."""
+    items = []
+    for i, line in enumerate(lines, start):
+        line = line.rstrip()
+        if line.startswith("- "):
+            mt = re.match(r"- \[([ xX.])\] (.*)", line)
+            state = ({" ": "todo", ".": "doing"}.get(mt.group(1).lower(), "done")) if mt else "note"
+            items.append(dict(line=i, orig=line, text=mt.group(2) if mt else line[2:], state=state, sub=[]))
+        elif items and re.match(r"^\s+- ", line):
+            items[-1]["sub"].append(re.sub(r"^\s+- (\[[ xX.]\] )?", "", line))
+    return items
+
+
+def read_deliverables(text):
+    """'## Deliverables' → {(year, month): [(heading, [item])]}: one '### YYYY-MM …' block per rung, in file order."""
+    out, lines = {}, text.split("\n")
+    head = next((i for i, l in enumerate(lines) if l.rstrip() == "## Deliverables"), None)
+    if head is None:
+        return out
+    block, start = None, None
+    def close(end):
+        if block:
+            out.setdefault(block[0], []).append((block[1], _items(lines[start:end], start)))
+    for i in range(head + 1, len(lines) + 1):
+        line = lines[i].rstrip() if i < len(lines) else "## "
+        if line.startswith("## "):
+            close(i)
+            break
+        m = re.match(r"### (\d{4})-(0[1-9]|1[0-2])\b\s*[—–-]?\s*(.*)", line)
+        if m:
+            close(i)
+            block, start = ((int(m.group(1)), int(m.group(2))), m.group(3).strip()), i + 1
+    return out
+
+
 def read_ladder(path, rel):
-    """One ladder file: its '## Rungs' rows grouped by (year, month), gate cells tagged as ladder.py tags them."""
+    """One ladder file: its '## Rungs' rows grouped by (year, month), gate cells tagged as ladder.py tags them,
+    and each rung's '## Deliverables' checklist (matched by month, then by rung name when a month has several)."""
     lad = dict(rel=rel, label=rel, title="", months={}, gates=[], errors=[], missing=not path.exists())
     if lad["missing"]:
         return lad
@@ -68,6 +105,7 @@ def read_ladder(path, rel):
     lad["title"] = next((l[2:].strip() for l in text.split("\n") if l.startswith("# ")), rel)
     lad["label"] = lad["title"]
     lad["gates"] = _table(text, "Gates")
+    deliverables = read_deliverables(text)
     for row in _table(text, "Rungs"):
         m = re.fullmatch(r"(\d{4})-(0[1-9]|1[0-2])", row.get("month", ""))
         if not m:
@@ -84,6 +122,14 @@ def read_ladder(path, rel):
                     lad["errors"].append("rung %r: unknown gate tag %s" % (row.get("rung", "?"), tag.group(0).strip()))
             row[g] = dict(state=state, text=value)
         lad["months"].setdefault((int(m.group(1)), int(m.group(2))), []).append(row)
+    for ym, rows in lad["months"].items():
+        blocks = deliverables.get(ym, [])
+        for row in rows:
+            # a block names its rung ("### 2026-11 — 50 µm"); an unnamed block, or the month's only block, fits the month's only rung
+            hit = next((b for b in blocks if b[0] and b[0] in row.get("rung", "")), None)
+            if hit is None and len(rows) == 1 and blocks:
+                hit = blocks[0]
+            row["items"] = hit[1] if hit else []
     return lad
 
 
@@ -100,12 +146,16 @@ def ladders(settings):
 
 
 def plan_path(settings, rel):
-    """The one file a plan edit may touch: plan/days/YYYY-MM-DD.md or plan/weeks/YYYY-MM-DD.md (a Monday)."""
+    """The one file a plan edit may touch: plan/days/YYYY-MM-DD.md, plan/weeks/YYYY-MM-DD.md (a Monday),
+    or a sprint file plan/<name>.md (its deliverables checklist)."""
     if not isinstance(rel, str):
         raise Error(400, "invalid_path", "Plan path must be a string")
+    sprint = re.fullmatch(r"plan/([A-Za-z0-9][A-Za-z0-9_.-]*)\.md", rel)
+    if sprint and ".." not in sprint.group(1):
+        return resolve_within(settings.repo_root, "plan", sprint.group(1) + ".md")
     m = re.fullmatch(r"plan/(days|weeks)/(\d{4}-\d{2}-\d{2})\.md", rel)
     if not m:
-        raise Error(400, "invalid_path", "Plan path must be plan/days/YYYY-MM-DD.md or plan/weeks/YYYY-MM-DD.md")
+        raise Error(400, "invalid_path", "Plan path must be plan/<sprint>.md, plan/days/YYYY-MM-DD.md or plan/weeks/YYYY-MM-DD.md")
     try:
         day = dt.date.fromisoformat(m.group(2))
     except ValueError:
@@ -137,9 +187,7 @@ def read_plan(settings, rel):
             if sec is None:
                 sec = dict(name="(no project)", level=2, items=[])
                 info["sections"].append(sec)
-            mt = re.match(r"- \[([ xX.])\] (.*)", line)
-            state = ({" ": "todo", ".": "doing"}.get(mt.group(1).lower(), "done")) if mt else "note"
-            sec["items"].append(dict(line=i, orig=line, text=mt.group(2) if mt else line[2:], state=state, sub=[]))
+            sec["items"] += _items([line], i)
         elif sec and sec["items"] and re.match(r"^\s+- ", line):
             sec["items"][-1]["sub"].append(re.sub(r"^\s+- (\[[ xX.]\] )?", "", line))
     return info
@@ -247,16 +295,10 @@ def render_ladder(settings, today=None):
     notes, problems = [], []
     for lad in lads:
         cells.append('<div class="lname">%s<small>%s</small></div>' % (html.escape(lad["label"]), html.escape(lad["rel"])))
+        names = _gate_names(lad["gates"])
         for ym in months:
             cls = " now" if ym == cur else " past" if ym < cur else ""
-            rungs = ""
-            for r in lad["months"].get(ym, []):
-                gates = "".join('<span class="g %s" title="%s · %s: %s">%s</span>' % (
-                    r[g]["state"], g.upper(), r[g]["state"], html.escape(r[g]["text"] or "—"), g.upper()) for g in ("g1", "g2", "g3"))
-                rungs += ('<div class="rung"><div class="rtop"><b>%s</b><span class="rdata">%s</span></div><div class="gates">%s</div>'
-                          '<div class="rstat">%s</div><div class="rnb">%s</div></div>'
-                          % (inline(r.get("rung", "")), inline(r.get("data", "")), gates, inline(r.get("status", "")),
-                             inline(r.get("notebook_question", ""))))
+            rungs = "".join(_rung_card(lad["rel"], r, names) for r in lad["months"].get(ym, []))
             cells.append('<div class="lcell%s">%s</div>' % (cls, rungs))
         if lad["missing"]:
             notes.append('<p class="empty"><b>%s</b> is missing, so its row is empty.</p>' % html.escape(lad["rel"]))
@@ -267,13 +309,54 @@ def render_ladder(settings, today=None):
                      % (html.escape(lad["title"]), html.escape(lad["rel"]), gates))
         problems += ["%s: %s" % (lad["rel"], e) for e in lad["errors"]]
     body = ('<h1>%s · ladders by month · %d row%s, %d months (scroll sideways; ‹ › move one month)</h1>'
-            '<p class="legend">Gates: <span class="g met">met</span> <span class="g open">open</span> <span class="g failed">failed</span> '
-            '<span class="g target">target</span> <span class="g none">—</span> · tags are read from each ladder file, never inferred; hover a gate for its text</p>'
+            '<p class="legend">A rung is one month\'s deliverable; it passes when its three gates are met: '
+            '<b>G1 it ran</b> · <b>G2 quality</b> · <b>G3 cost</b> (each ladder\'s own gate table is under the grid). '
+            'Gate colours: <span class="g met">met</span> <span class="g open">open</span> <span class="g failed">failed</span> '
+            '<span class="g target">target</span> <span class="g none">—</span>, read from the ladder file, never inferred. '
+            'Below the gates, the rung\'s deliverables are a checklist (<span class="dot done"></span> done '
+            '<span class="dot doing"></span> in progress <span class="dot todo"></span> open) edited in place.</p>'
             '<div class="lwrap"><button class="larr" data-dir="-1" title="earlier month">‹</button>'
             '<div class="lscroll" id="lscroll"><div class="lgrid" data-n="%d">%s</div></div>'
             '<button class="larr" data-dir="1" title="later month">›</button></div>%s'
             % (today.strftime("%a %m/%d"), len(lads), "s" if len(lads) != 1 else "", len(months), len(months), "".join(cells), "".join(notes)))
     return page("Plan · Ladder", "plan", "ladder", body, problems, "Rows: every plan/*.md with a ## Rungs table (one per sprint).")
+
+
+GATE_WORDS = {"g1": "it ran", "g2": "quality", "g3": "cost"}
+GATE_STATE = {"met": "met", "open": "open", "failed": "failed", "target": "target", "none": "—"}
+
+
+def _gate_names(gates):
+    """{'g1': ('it ran', question)} from a ladder's Gates table, with the default words when the table lacks them."""
+    names = {}
+    for g in gates:
+        m = re.match(r"\**(G[123])\**\s*[—–-]+\s*(.+?)\**$", g.get("gate", ""))
+        if m:
+            names[m.group(1).lower()] = (m.group(2).strip("* "), g.get("question", ""))
+    return {k: names.get(k, (GATE_WORDS[k], "")) for k in GATE_WORDS}
+
+
+def _rung_card(rel, r, names):
+    """One rung: header (name, data, overall state), one row per gate, then the deliverables checklist."""
+    states = [r[g]["state"] for g in ("g1", "g2", "g3")]
+    overall = ("failed" if "failed" in states else "met" if states[0] == "met" and states[1] == "met" and states[2] in ("met", "none")
+               else "open" if "met" in states or "open" in states else "target" if "target" in states else "none")
+    rows = ""
+    for g in ("g1", "g2", "g3"):
+        word, question = names[g]
+        rows += ('<div class="gate %s" title="%s"><span class="g %s">%s</span><span class="gw">%s</span><span class="gt">%s</span></div>'
+                 % (r[g]["state"], html.escape(question, quote=True), r[g]["state"], g.upper(), html.escape(word),
+                    inline(r[g]["text"]) if r[g]["text"].strip() not in ("", "-", "—") else '<i class="none">no evidence yet</i>'))
+    items = r.get("items", [])
+    done = sum(1 for it in items if it["state"] == "done")
+    todo = ('<div class="dhead">deliverables <span class="dn">%d / %d</span></div><ul class="todo">%s</ul>'
+            % (done, len(items), "".join(_todo(rel, it) for it in items))) if items else ""
+    nb = r.get("notebook_question", "").strip()
+    nb = '<div class="rnb">%s</div>' % inline(nb, links=True) if nb not in ("", "-", "—") else ""
+    return ('<div class="rung %s"><div class="rtop"><b>%s</b><span class="rdata">%s</span><span class="g %s">%s</span></div>'
+            '<div class="gates">%s</div>%s<div class="rstat">%s</div>%s</div>'
+            % (overall, inline(r.get("rung", "")), inline(r.get("data", "")), overall, GATE_STATE[overall], rows, todo,
+               inline(r.get("status", "")), nb))
 
 
 def _todo(rel, item):
