@@ -54,7 +54,16 @@ follow_pin() {
     [ -z "$(git -C "$tool" status --porcelain --untracked-files=no)" ] || return 0
     git -C "$tool" cat-file -e "$pinned^{commit}" 2>/dev/null || git -C "$tool" fetch -q origin || return 0
     git -C "$tool" merge-base --is-ancestor "$current" "$pinned" 2>/dev/null || return 0
-    git submodule update -q -- "$sub" && echo "rdash-sync: $sub follows the pin: ${current:0:7} -> ${pinned:0:7}"
+    git submodule update -q -- "$sub" || return 0
+    echo "rdash-sync: $sub follows the pin: ${current:0:7} -> ${pinned:0:7}"
+    # The files moved; the board process still runs the old ones (hebb, 2026-11-09: a
+    # merged pin served 404s until a hand restart). Stop it here, under the same user:
+    # rdash_service.py sees its health check fail and systemd starts the board again
+    # from the unit's own environment, on the checkout that is now on disk.
+    if "$tool/dashboard/app/research_dash.sh" status 2>/dev/null | grep -q running; then
+        "$tool/dashboard/app/research_dash.sh" stop >/dev/null 2>&1 \
+            && echo "rdash-sync: board stopped so its service restarts on ${pinned:0:7}"
+    fi
 }
 # Pathspec wildcards match across '/', so these cover cards/inbox/ too.
 OWNED=('projects/*/cards/*' 'projects/*/runs/*')
