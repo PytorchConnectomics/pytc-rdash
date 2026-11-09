@@ -29,7 +29,7 @@ from .safety import Error, publish_replace, resolve_within, writer_lock
 KINDS = [("weekly", "weekly summary", "Thu"), ("heads", "heads meeting", "Tue"),
          ("ed", "Ed 1-on-1", "Thu"), ("konrad", "Konrad 1-on-1", "Thu"), ("note", "note", "")]
 KIND_LABEL = {k: l for k, l, _ in KINDS}
-MODES = [("project", "Project", "/"), ("plan", "Plan", "/plan/ladder"), ("summary", "Summary", "/summary")]
+MODES = [("plan", "Plan", "/plan/ladder"), ("project", "Project", "/"), ("summary", "Summary", "/summary")]
 PLAN_SUBS = [("ladder", "Ladder", "/plan/ladder"), ("daily", "Daily", "/plan/daily"), ("weekly", "Weekly", "/plan/weekly")]
 NAME = re.compile(r"\d{4}-\d{2}-\d{2}\.md")
 MAX_FILE = 1048576
@@ -218,8 +218,8 @@ def new_plan(settings, rel, projects=()):
 
 def page(title, mode, sub, body, problems=(), source=""):
     nav = "".join('<a href="%s" class="mode%s">%s</a>' % (u, " on" if k == mode else "", l) for k, l, u in MODES)
-    if mode == "plan":
-        nav += '<span class="sep"></span>' + "".join(
+    if mode == "plan":   # the three mode buttons sit centred on their own row; the Plan sub-views below them
+        nav += '</nav><nav class="subs">' + "".join(
             '<a href="%s" class="%s">%s</a>' % (u, "on" if k == sub else "", l) for k, l, u in PLAN_SUBS)
     prob = "".join("<li>%s</li>" % html.escape(p) for p in problems)
     return ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'

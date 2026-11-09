@@ -2,11 +2,12 @@
   --late:#b22; --soon:#c07a10; --done:#287d49; --open:#c07a10; }
 * { box-sizing:border-box }
 body { margin:0 auto; padding:16px 4vw 40px; background:var(--bg); color:var(--fg); font:14px/1.45 system-ui, sans-serif; max-width:1500px }
-nav.modes { display:flex; gap:4px; margin-bottom:14px; flex-wrap:wrap; align-items:center }
-nav.modes a { padding:6px 14px; border-radius:6px; color:var(--mute); text-decoration:none; background:#e8eee8 }
-nav.modes a.on { background:var(--card); color:var(--fg); font-weight:600; box-shadow:0 1px 3px rgba(0,0,0,.08) }
-nav.modes a.mode { font-weight:600 } nav.modes a.mode.on { background:var(--accent); color:#fff }
-nav.modes .sep { width:1px; height:22px; background:var(--line); margin:0 6px }
+nav.modes, nav.subs { display:flex; gap:8px; flex-wrap:wrap; align-items:center; justify-content:center }
+nav.modes { margin-bottom:10px } nav.subs { margin-bottom:16px; gap:4px }
+nav.modes a { padding:10px 28px; border:1px solid #c9d5cc; border-radius:8px; background:var(--card); color:var(--fg); text-decoration:none; font-weight:600; font-size:15px }
+nav.modes a:hover { border-color:var(--accent) } nav.modes a.on { background:var(--accent); border-color:var(--accent); color:#fff }
+nav.subs a { padding:5px 14px; border-radius:6px; color:var(--mute); text-decoration:none; background:#e8eee8; font-size:13px }
+nav.subs a.on { background:var(--card); color:var(--fg); font-weight:600; box-shadow:0 1px 3px rgba(0,0,0,.08) }
 h1 { font-size:14px; font-weight:600; color:var(--mute); margin:0 0 8px }
 h2 { font-size:15px; margin:14px 0 8px } small { color:var(--mute); font-weight:400 }
 code { font-size:12px } .src { font-size:11px; color:var(--mute) } .problems { color:var(--late) } .empty { color:var(--mute); font-size:12px }
