@@ -11,7 +11,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from dashboard.app import attention, cards, inspection, contract, jobs, receipts, results
-from dashboard.app import evidence, goals, questions, tracks, ladder, focus
+from dashboard.app import evidence, goals, questions, tracks, ladder, focus, planner
 from dashboard.app.config import Settings
 from dashboard.app.projects import list_projects
 from dashboard.app.safety import Error, cache_path
@@ -33,10 +33,21 @@ def enrich(settings, project, records):
     return records
 
 
+def _date(value):
+    """YYYY-MM-DD from a query string, or None (= today) when absent or malformed."""
+    import datetime
+    try:
+        return datetime.date.fromisoformat(value) if value else None
+    except ValueError:
+        return None
+
+
 def make_server(settings):
     cache_path(settings).mkdir(parents=True, exist_ok=True)
     static = Path(__file__).parent / "static"
-    assets = {name: (static / name).read_bytes() for name in ("index.html", "app.js", "styles.css")}
+    assets = {name: (static / name).read_bytes() for name in ("index.html", "app.js", "styles.css", "planner.css", "planner.js")}
+    kinds = {"index.html": "text/html", "app.js": "text/javascript", "styles.css": "text/css",
+             "planner.css": "text/css", "planner.js": "text/javascript"}
 
     class Handler(BaseHTTPRequestHandler):
         def __getattr__(self, name):
@@ -90,8 +101,21 @@ def make_server(settings):
                 if self.command == "GET":
                     name = "index.html" if path == "/" else path[len("/static/"):] if path.startswith("/static/") else None
                     if name in assets:
-                        kind = {"index.html": "text/html", "app.js": "text/javascript", "styles.css": "text/css"}[name]
-                        return self.send_data(200, assets[name], kind)
+                        return self.send_data(200, assets[name], kinds[name])
+                    # Plan and Summary modes: server-rendered pages over plan/ (planner.py)
+                    optional = lambda key: (query.get(key) or [""])[0]
+                    if path in ("/plan/ladder", "/plan/daily", "/plan/weekly", "/summary", "/summary/view"):
+                        if path == "/plan/ladder":
+                            text = planner.render_ladder(settings)
+                        elif path == "/plan/daily":
+                            text = planner.render_daily(settings, _date(optional("d")))
+                        elif path == "/plan/weekly":
+                            text = planner.render_weekly(settings, _date(optional("w")))
+                        elif path == "/summary":
+                            text = planner.render_summary(settings)
+                        else:
+                            text = planner.render_summary_view(settings, optional("p"))
+                        return self.send_data(200, text.encode("utf-8"), "text/html")
                     if path == "/api/health":
                         result = dict(ok=True, port=self.server.server_address[1], repo_root_name=settings.repo_root.name, pid=os.getpid(), owner=settings.owner, require_owner=settings.require_owner)
                     elif path == "/api/ladder":
@@ -144,6 +168,14 @@ def make_server(settings):
                     raise Error(400, "invalid_json", "Body must be an object")
                 if path == "/api/goal/command":
                     return self.send_data(200, goals.command(settings, data))
+                if path == "/api/plan/edit":
+                    return self.send_data(200, dict(ok=True, message=planner.apply_edit(
+                        settings, data.get("path"), data.get("line"), data.get("orig"), data.get("op"))))
+                if path == "/api/plan/new":
+                    projects = data.get("projects", [])
+                    if not isinstance(projects, list) or any(not isinstance(p, str) or "\n" in p or len(p) > 80 for p in projects):
+                        raise Error(400, "invalid_projects", "projects must be a list of short names")
+                    return self.send_data(200, dict(ok=True, message=planner.new_plan(settings, data.get("path"), projects)))
                 if path == "/api/evidence/feedback":
                     result = evidence.feedback(settings, data)
                 elif path == "/api/idea":

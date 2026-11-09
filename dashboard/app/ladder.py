@@ -16,7 +16,10 @@ def _table(text, heading):
 
 
 def read(settings):
-    path = resolve_within(settings.repo_root, 'LADDER.md')
+    # The sprint ladder lives in plan/ (the team-facing plan); a root LADDER.md is the older location.
+    path = resolve_within(settings.repo_root, 'plan', 'LADDER.md')
+    if not path.exists():
+        path = resolve_within(settings.repo_root, 'LADDER.md')
     if not path.exists():
         return dict(rows=[], gates=[], errors=[], missing=True)
     with path.open('rb') as source:
