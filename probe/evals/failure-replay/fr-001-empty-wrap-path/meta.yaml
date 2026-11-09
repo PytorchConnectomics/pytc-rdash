@@ -1,0 +1,5 @@
+id: fr-001-empty-wrap-path
+family: failure-replay
+split: public
+expert_minutes: 3
+source: cajal Slurm job 57, 2026-09-27; log is /data/donglai/logs/gdrive-dl-57.log (verbatim). The submit command is reconstructed from workflow/machines/cajal-setup-plan.md §7b.

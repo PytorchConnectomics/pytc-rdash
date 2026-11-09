@@ -1,0 +1,2 @@
+{"cause": ["empty_path_at_submit"], "action": ["retry_with_fix"], "notify": false,
+ "reference_fix": "Write literal paths inside --wrap (or submit a script file); $SRC/$DST expanded at submit time in a shell where they were unset."}

@@ -18,6 +18,14 @@ Read this before writing or modifying code. For agent workflow, see [CLAUDE.md](
 
 Keep scientific rationale with its decision and evidence. Link external source material instead of copying it into a second editable record. Preserve each project's sharing boundary: shared specs must not expose private data or filesystem paths; keep restricted execution configuration on its owning side.
 
+## Evaluation bank
+
+`probe/evals/` (behavior cases in `cases.json` and the `failure-replay/` tasks) is the
+human-owned evaluator of the agent engine. Any PR that adds, changes or removes a case,
+expected answer, verifier or recorded score requires DW's explicit approval; an agent or
+self-improvement loop may run the bank, never edit it. This is the review-rule form of the
+former root `dw-os/evals/` directory boundary (2026-11-08).
+
 ## Project Spec Format
 
 For an executable assignment, `projects/<name>/spec.md` should contain the following sections or their existing equivalents. An exploratory project may record unresolved fields explicitly; do not fabricate paths, data dimensions, or metrics to fill a template.
