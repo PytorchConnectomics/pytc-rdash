@@ -63,9 +63,24 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(git(self.board, "status", "--porcelain"), "")
         self.assertTrue((self.board / "projects/alpha/cards/new.md").is_file())
         log = git(self.origin, "log", "--format=%s", "main")
-        self.assertIn("rdash: board edits and run receipts (%s sync)" % HOST, log)
+        self.assertIn("rdash: board edits, plan ticks and run receipts (%s sync)" % HOST, log)
         self.assertIn("peer card", log)
         self.assertEqual(git(self.origin, "show", "main:projects/alpha/cards/q.md"), "card v2 (board edit)")
+
+    def test_plan_edits_made_on_the_board_are_committed_like_cards(self):
+        (self.board / "plan").mkdir()
+        (self.board / "plan/LADDER.md").write_text("# L\n\n## Deliverables\n\n### 2026-08 — x\n\n- [x] a\n")
+        git(self.board, "add", "plan")
+        git(self.board, "commit", "-qm", "ladder")
+        git(self.board, "push", "-q", "origin", "main")
+        (self.board / "plan/LADDER.md").write_text("# L\n\n## Deliverables\n\n### 2026-08 — x\n\n- [x] a\n- [ ] b\n")
+        (self.board / "plan/days").mkdir()
+        (self.board / "plan/days/2026-11-09.md").write_text("# Mon\n\n## p\n\n- [ ] c\n")
+        result, state = self.sync()
+        self.assertEqual(state["state"], "ok", result.stdout + result.stderr)
+        self.assertEqual(git(self.board, "status", "--porcelain"), "")
+        self.assertIn("- [ ] b", git(self.origin, "show", "main:plan/LADDER.md"))
+        self.assertIn("- [ ] c", git(self.origin, "show", "main:plan/days/2026-11-09.md"))
 
     def test_other_tracked_changes_block_and_are_never_committed(self):
         (self.board / "README.md").write_text("someone's work\n")
@@ -94,7 +109,7 @@ class SyncTests(unittest.TestCase):
         (self.board / "projects/alpha/cards/q.md").write_text("board edit\n")
         result, state = self.sync()
         self.assertEqual(state["state"], "conflict")
-        self.assertEqual(git(self.board, "log", "--format=%s", "-1"), "rdash: board edits and run receipts (%s sync)" % HOST)
+        self.assertEqual(git(self.board, "log", "--format=%s", "-1"), "rdash: board edits, plan ticks and run receipts (%s sync)" % HOST)
         self.assertEqual(git(self.origin, "log", "--format=%s", "-1", "main"), "peer edit")
 
     def test_a_host_that_drops_out_warns_until_it_is_back_or_removed(self):

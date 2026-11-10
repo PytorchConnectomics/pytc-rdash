@@ -3,7 +3,8 @@
 #
 #   1. collect new run receipts from the launch hosts (receipts.py collect);
 #   2. commit what rdash itself wrote -- projects/*/cards (board edits, ideas,
-#      batch ticks) and projects/*/runs (receipts) -- under the board's writer lock;
+#      batch ticks), projects/*/runs (receipts) and plan/ (the Plan pages' checklist
+#      ticks, edits and adds) -- under the board's writer lock;
 #   3. rebase onto origin/main and push, so every checkout sees the change and the
 #      board serves what was pushed from anywhere within a minute.
 #
@@ -65,8 +66,10 @@ follow_pin() {
             && echo "rdash-sync: board stopped so its service restarts on ${pinned:0:7}"
     fi
 }
-# Pathspec wildcards match across '/', so these cover cards/inbox/ too.
-OWNED=('projects/*/cards/*' 'projects/*/runs/*')
+# Pathspec wildcards match across '/', so these cover cards/inbox/ and plan/days/ too.
+# plan/ joined on 2026-11-09: a checklist item deleted on the board (plan/LADDER.md)
+# blocked the hebb sync for ten hours, and with it every pin move.
+OWNED=('projects/*/cards/*' 'projects/*/runs/*' 'plan/*')
 
 branch=$(git symbolic-ref -q --short HEAD) || branch=
 if [ "$branch" != main ]; then
@@ -116,14 +119,14 @@ git fetch -q origin main || { report warn "git fetch failed; will retry"; exit 0
 exec 9>>"$root/.rdash.lock"
 flock -w 30 9 || { report busy "board writer lock held for 30 s; will retry"; exit 0; }
 follow_pin
-other=$( { git diff --name-only; git diff --cached --name-only; } | grep -vE '^projects/[^/]+/(cards|runs)/' | sort -u | head -5)
+other=$( { git diff --name-only; git diff --cached --name-only; } | grep -vE '^(projects/[^/]+/(cards|runs)|plan)/' | sort -u | head -5)
 if [ -n "$other" ]; then
-    report blocked "tracked changes outside cards/ and runs/ in the board checkout: $(echo $other)"; exit 0
+    report blocked "tracked changes outside cards/, runs/ and plan/ in the board checkout: $(echo $other)"; exit 0
 fi
 changed=$(git ls-files -z --modified --deleted --others --exclude-standard -- "${OWNED[@]}" | tr '\0' '\n' | sort -u)
 if [ -n "$changed" ]; then
     printf '%s\n' "$changed" | git add -A --pathspec-from-file=- \
-        && git commit -q -m "rdash: board edits and run receipts ($(hostname -s) sync)" \
+        && git commit -q -m "rdash: board edits, plan ticks and run receipts ($(hostname -s) sync)" \
         || { report warn "commit failed"; exit 1; }
 fi
 if ! git rebase -q origin/main >/dev/null 2>&1; then
