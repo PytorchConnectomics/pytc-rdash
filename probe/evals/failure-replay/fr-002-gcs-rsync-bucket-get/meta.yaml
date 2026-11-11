@@ -1,0 +1,5 @@
+id: fr-002-gcs-rsync-bucket-get
+family: failure-replay
+split: public
+expert_minutes: 10
+source: cajal Slurm job 61, 2026-09-27; log is /data/donglai/logs/gcs-dl-61.log (verbatim). The fix that worked is /data/donglai/logs/gcs-dl.sh (job 62).

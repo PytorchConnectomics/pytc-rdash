@@ -63,4 +63,11 @@ Preferred for this lab (paths under `dw-kb/skills/`):
   fence tracking its artifacts and SLURM jobs. Triggered by a prompt starting
   `radd-task:`. Use `radd-hypo` instead when the request is really a question.
 
+- **[extend-workbench](extend-workbench/SKILL.md)** — how any agent adds a project,
+  card, notebook, host config or lesson to a workbench as a PR that passes the
+  workbench checks. Shipped so students' agents extend the repo without the maintainer.
+
+- **[pr-review](pr-review/SKILL.md)** — review a PR and write exactly one recommendation
+  (merge / close / needs-change) with evidence; the maintainer decides. Never merges.
+
 (`resume-fleet.sh` stays in this repo — it's an operational fleet script, not a skill.)

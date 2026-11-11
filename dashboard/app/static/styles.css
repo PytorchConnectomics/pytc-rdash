@@ -7,6 +7,10 @@ h1 { margin: 0 0 8px; font-size: 28px; }
 p { line-height: 1.5; }
 .sub { color: #60706a; font-size: 14px; }
 nav { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
+nav.modes { margin: 0 0 18px; gap: 8px; justify-content: center; }
+nav.modes a { padding: 10px 28px; border: 1px solid #c9d5cc; border-radius: 8px; background: #fff; color: #20302e; text-decoration: none; font-weight: 600; font-size: 15px; }
+nav.modes a:hover { border-color: #236b55; }
+nav.modes a.on { background: #236b55; border-color: #236b55; color: #fff; }
 
 button, select, input, textarea {
   font: inherit; border: 1px solid #c9d5cc; border-radius: 8px;

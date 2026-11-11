@@ -9,7 +9,7 @@ Method: [2026-11-05 planner–implementer trial](../../../probe/reviews/2026-11-
 
 ```
 projects/<project>/focus/
-  F-NNN.md                 # notebook: goal, State, Best, Next — the long-lived state
+  F-NNN.md                 # notebook: frontmatter `state:`, goal, State, Best, Next — the long-lived state
   F-NNN/
     iter-01/
       plan.md              # Fable writes; frozen once Opus starts
@@ -38,6 +38,12 @@ projects/<project>/focus/
 5. **Negative and failed results are written up too.** A failed job is a receipt plus an interpretation.
 6. **Respect project boundaries.** No Mindspan data or credentials go into BC files. Paths that point
    at data are fine; data contents are not.
+7. **One state signal, declared not inferred.** The notebook's frontmatter carries
+   `state: working | needs-you | paused | done`. A session may end in a waiting state only by setting
+   `needs-you` and writing a `## Needs you` section with one to three ranked options and a
+   `Recommendation:` line (the same block closes `interpret.md`). The board and
+   `rdash/dashboard/app/needs_you.py` read that field; a free-text `Decision needed:` line is
+   display, not the bell. `paused` is set by a person and rings nothing.
 
 Templates: [plan.md](plan.md) · [receipt.md](receipt.md) · [interpret.md](interpret.md).
 

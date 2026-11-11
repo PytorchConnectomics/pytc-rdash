@@ -63,9 +63,24 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(git(self.board, "status", "--porcelain"), "")
         self.assertTrue((self.board / "projects/alpha/cards/new.md").is_file())
         log = git(self.origin, "log", "--format=%s", "main")
-        self.assertIn("rdash: board edits and run receipts (%s sync)" % HOST, log)
+        self.assertIn("rdash: board edits, plan ticks and run receipts (%s sync)" % HOST, log)
         self.assertIn("peer card", log)
         self.assertEqual(git(self.origin, "show", "main:projects/alpha/cards/q.md"), "card v2 (board edit)")
+
+    def test_plan_edits_made_on_the_board_are_committed_like_cards(self):
+        (self.board / "plan").mkdir()
+        (self.board / "plan/LADDER.md").write_text("# L\n\n## Deliverables\n\n### 2026-08 — x\n\n- [x] a\n")
+        git(self.board, "add", "plan")
+        git(self.board, "commit", "-qm", "ladder")
+        git(self.board, "push", "-q", "origin", "main")
+        (self.board / "plan/LADDER.md").write_text("# L\n\n## Deliverables\n\n### 2026-08 — x\n\n- [x] a\n- [ ] b\n")
+        (self.board / "plan/days").mkdir()
+        (self.board / "plan/days/2026-11-09.md").write_text("# Mon\n\n## p\n\n- [ ] c\n")
+        result, state = self.sync()
+        self.assertEqual(state["state"], "ok", result.stdout + result.stderr)
+        self.assertEqual(git(self.board, "status", "--porcelain"), "")
+        self.assertIn("- [ ] b", git(self.origin, "show", "main:plan/LADDER.md"))
+        self.assertIn("- [ ] c", git(self.origin, "show", "main:plan/days/2026-11-09.md"))
 
     def test_other_tracked_changes_block_and_are_never_committed(self):
         (self.board / "README.md").write_text("someone's work\n")
@@ -94,7 +109,7 @@ class SyncTests(unittest.TestCase):
         (self.board / "projects/alpha/cards/q.md").write_text("board edit\n")
         result, state = self.sync()
         self.assertEqual(state["state"], "conflict")
-        self.assertEqual(git(self.board, "log", "--format=%s", "-1"), "rdash: board edits and run receipts (%s sync)" % HOST)
+        self.assertEqual(git(self.board, "log", "--format=%s", "-1"), "rdash: board edits, plan ticks and run receipts (%s sync)" % HOST)
         self.assertEqual(git(self.origin, "log", "--format=%s", "-1", "main"), "peer edit")
 
     def test_a_host_that_drops_out_warns_until_it_is_back_or_removed(self):
@@ -123,3 +138,112 @@ class SyncTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SubmoduleSyncTests(unittest.TestCase):
+    """The deployed layout: a team repository with rdash/ as its submodule (pytc-jam-msi)."""
+
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory(prefix="rdash-sync-sub-")
+        self.addCleanup(temp.cleanup)
+        root = Path(temp.name)
+        self.env = dict(os.environ, HOME=str(root), RDASH_ENV_FILE=str(root / "no-env"), RDASH_SSH_HOSTS="",
+                        RDASH_HOST_ALIAS="hub", RESEARCH_DASH_CACHE=str(root / "cache"), XDG_CACHE_HOME=str(root),
+                        GIT_AUTHOR_NAME="hub", GIT_AUTHOR_EMAIL="hub@x", GIT_COMMITTER_NAME="hub",
+                        GIT_COMMITTER_EMAIL="hub@x", GIT_CONFIG_COUNT="1",
+                        GIT_CONFIG_KEY_0="protocol.file.allow", GIT_CONFIG_VALUE_0="always")
+        self.cache = root / "cache"
+        self.tool_origin, self.origin = root / "rdash.git", root / "team.git"
+        tool_src = root / "rdash-src"
+        for bare in (self.tool_origin, self.origin):
+            subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(bare)], check=True)
+        self.run_git(root, "clone", "-q", str(self.tool_origin), str(tool_src))
+        self.run_git(tool_src, "checkout", "-q", "-B", "main")
+        for package in ("app", "supervisor"):   # the server imports both, so a board can start from the fixture
+            shutil.copytree(SOURCE / "dashboard" / package, tool_src / "dashboard" / package,
+                            ignore=shutil.ignore_patterns("__pycache__"))
+        (tool_src / "dashboard/__init__.py").write_text("")
+        self.run_git(tool_src, "add", "-A")
+        self.run_git(tool_src, "commit", "-qm", "tool v1")
+        self.run_git(tool_src, "push", "-q", "origin", "main")
+        self.tool_src = tool_src
+        seed = root / "seed"
+        self.run_git(root, "clone", "-q", str(self.origin), str(seed))
+        self.run_git(seed, "checkout", "-q", "-B", "main")
+        self.run_git(seed, "submodule", "add", "-q", str(self.tool_origin), "rdash")
+        (seed / "projects/alpha/cards").mkdir(parents=True)
+        (seed / "projects/alpha/cards/q.md").write_text("card v1\n")
+        (seed / ".gitignore").write_text(".rdash.lock\n")
+        self.run_git(seed, "add", "-A")
+        self.run_git(seed, "commit", "-qm", "init")
+        self.run_git(seed, "push", "-q", "origin", "main")
+        self.board, self.peer = root / "board", root / "peer"
+        for clone in (self.board, self.peer):
+            self.run_git(root, "clone", "-q", "--recurse-submodules", str(self.origin), str(clone))
+
+    def run_git(self, repo, *args):
+        return subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True, text=True,
+                              env=self.env).stdout.strip()
+
+    def bump_tool_pin_from_peer(self):
+        (self.tool_src / "NOTE").write_text("v2\n")
+        self.run_git(self.tool_src, "add", "-A")
+        self.run_git(self.tool_src, "commit", "-qm", "tool v2")
+        self.run_git(self.tool_src, "push", "-q", "origin", "main")
+        self.run_git(self.peer / "rdash", "pull", "-q", "origin", "main")
+        self.run_git(self.peer, "commit", "-qam", "rdash: bump")
+        self.run_git(self.peer, "push", "-q", "origin", "main")
+        return self.run_git(self.tool_src, "rev-parse", "HEAD")
+
+    def sync(self):
+        result = subprocess.run([str(self.board / "rdash/dashboard/app/rdash_sync.sh")], env=self.env,
+                                capture_output=True, text=True, timeout=120)
+        return result, json.loads((self.cache / "sync.json").read_text())
+
+    def test_a_pin_bump_pulled_by_the_sync_moves_the_submodule(self):
+        pinned = self.bump_tool_pin_from_peer()
+        result, state = self.sync()
+        self.assertEqual(state["state"], "ok", result.stdout + result.stderr)
+        self.assertEqual(self.run_git(self.board / "rdash", "rev-parse", "HEAD"), pinned)
+        self.assertEqual(self.run_git(self.board, "status", "--porcelain"), "")
+        result, state = self.sync()     # and the next run is not blocked
+        self.assertEqual(state["state"], "ok", result.stdout + result.stderr)
+
+    def test_a_pin_bump_stops_the_running_board_so_its_service_restarts(self):
+        with socket.socket() as probe:
+            probe.bind(("127.0.0.1", 0))
+            port = probe.getsockname()[1]
+        env = dict(self.env, RDASH_REPO_ROOT=str(self.board), RESEARCH_DASH_PORT=str(port))
+        launcher = str(self.board / "rdash/dashboard/app/research_dash.sh")
+        self.addCleanup(subprocess.run, [launcher, "stop"], env=env, capture_output=True, timeout=60)
+        started = subprocess.run([launcher, "start"], env=env, capture_output=True, text=True, timeout=60)
+        self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
+        self.assertTrue((self.cache / "rdash.pid").is_file())
+        self.bump_tool_pin_from_peer()
+        result, state = self.sync()
+        self.assertEqual(state["state"], "ok", result.stdout + result.stderr)
+        self.assertIn("board stopped so its service restarts", result.stdout)
+        self.assertFalse((self.cache / "rdash.pid").exists())
+        self.assertIn("stopped", subprocess.run([launcher, "status"], env=env, capture_output=True, text=True, timeout=60).stdout)
+        result, state = self.sync()     # with no board running there is nothing to stop
+        self.assertEqual(state["state"], "ok", result.stdout + result.stderr)
+        self.assertNotIn("board stopped", result.stdout)
+
+    def test_a_board_already_behind_its_pin_heals(self):
+        old = self.run_git(self.board / "rdash", "rev-parse", "HEAD")
+        pinned = self.bump_tool_pin_from_peer()
+        self.run_git(self.board, "pull", "-q", "origin", "main")    # gitlink moves, files stay at `old`
+        self.assertEqual(self.run_git(self.board / "rdash", "rev-parse", "HEAD"), old)
+        result, state = self.sync()
+        self.assertEqual(state["state"], "ok", result.stdout + result.stderr)
+        self.assertEqual(self.run_git(self.board / "rdash", "rev-parse", "HEAD"), pinned)
+
+    def test_local_work_in_the_submodule_is_never_overwritten(self):
+        self.bump_tool_pin_from_peer()
+        self.run_git(self.board, "pull", "-q", "origin", "main")
+        (self.board / "rdash/NOTE2").write_text("someone's edit\n")
+        self.run_git(self.board / "rdash", "add", "NOTE2")
+        result, state = self.sync()
+        self.assertEqual(state["state"], "blocked", result.stdout + result.stderr)
+        self.assertIn("rdash", state["message"])
+        self.assertTrue((self.board / "rdash/NOTE2").is_file())

@@ -60,6 +60,24 @@ class ServerTests(RepoTest):
         self.assertEqual(json.loads(raw)["metadata"]["stage"], "probing")
         self.assertEqual(self.server.server_address[0], "127.0.0.1")
 
+    def test_plan_and_summary_routes(self):
+        for path in ("/plan/ladder", "/plan/daily", "/plan/weekly", "/plan/daily?d=2026-11-05", "/plan/weekly?w=bad", "/summary", "/static/planner.css", "/static/planner.js"):
+            status, raw = self.request("GET", path)
+            self.assertEqual(status, 200, path)
+        self.assertIn(b'<nav class="modes">', self.request("GET", "/")[1])
+        self.assertEqual(self.request("GET", "/summary/view?p=../LADDER.md")[0], 400)
+        self.assertEqual(self.request("GET", "/summary/view?p=plan/summary/none.md")[0], 404)
+        day = "plan/days/2026-11-09.md"
+        self.assertEqual(self.request("POST", "/api/plan/new", dict(path=day, projects=["alpha"]))[0], 200)
+        self.assertEqual(self.request("POST", "/api/plan/new", dict(path=day, projects="alpha"))[0], 400)
+        self.assertEqual(self.request("POST", "/api/plan/new", dict(path="plan/days/../x.md"))[0], 400)
+        self.assertEqual(self.request("POST", "/api/plan/new", dict(path=day), {"X-Rdash": None})[0], 403)
+        (self.repo / day).write_text((self.repo / day).read_text() + "- [ ] item\n")
+        line = (self.repo / day).read_text().split("\n").index("- [ ] item")
+        self.assertEqual(self.request("POST", "/api/plan/edit", dict(path=day, line=line, orig="- [ ] item", op="toggle"))[0], 200)
+        self.assertEqual(self.request("POST", "/api/plan/edit", dict(path=day, line=line, orig="- [ ] item", op="toggle"))[0], 409)
+        self.assertIn(b'data-orig="- [x] item"', self.request("GET", "/plan/daily?d=2026-11-09")[1])
+
     def test_request_guards(self):
         for method in ("GET", "POST"):
             for host in ("evil.example", "127.0.0.1:1", "localhost:1"):

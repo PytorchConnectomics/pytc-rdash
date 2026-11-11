@@ -1,0 +1,2 @@
+{"cause": ["missing_permission"], "action": ["retry_with_fix"],
+ "reference_fix": "Object-level read works but rsync needs storage.buckets.get; switch to the allowed cp -r -n path and verify count/bytes (as done in job 62)."}

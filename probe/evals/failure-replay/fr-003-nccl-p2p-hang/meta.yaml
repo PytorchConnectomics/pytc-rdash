@@ -1,0 +1,5 @@
+id: fr-003-nccl-p2p-hang
+family: failure-replay
+split: private
+expert_minutes: 60
+source: cajal NCCL P2P hang under IOMMU translated mode, 2026-09-26 (pm/clusters/cajal.md, Quirks). The log lines are reconstructed from that description, not copied from the original run.

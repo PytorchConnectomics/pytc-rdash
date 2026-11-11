@@ -3,7 +3,8 @@
 #
 #   1. collect new run receipts from the launch hosts (receipts.py collect);
 #   2. commit what rdash itself wrote -- projects/*/cards (board edits, ideas,
-#      batch ticks) and projects/*/runs (receipts) -- under the board's writer lock;
+#      batch ticks), projects/*/runs (receipts) and plan/ (the Plan pages' checklist
+#      ticks, edits and adds) -- under the board's writer lock;
 #   3. rebase onto origin/main and push, so every checkout sees the change and the
 #      board serves what was pushed from anywhere within a minute.
 #
@@ -40,8 +41,35 @@ os.replace(tmp, path)
 PY
     echo "rdash-sync: $1: $2"
 }
-# Pathspec wildcards match across '/', so these cover cards/inbox/ too.
-OWNED=('projects/*/cards/*' 'projects/*/runs/*')
+# rdash as a submodule: follow the team repository's pin. A rebase moves the gitlink
+# but not the submodule's files, and the stale checkout then reads as a tracked change
+# that blocks every later run (pytc-jam-msi on hebb, 2026-11-08 and 11-09). Only a
+# clean submodule moving forward is updated; anything else is someone's work and is
+# left for the tracked-change check to report.
+follow_pin() {
+    [ "$tool" != "$root" ] || return 0
+    local sub=${tool#"$root"/} pinned current
+    pinned=$(git rev-parse -q --verify "HEAD:$sub" 2>/dev/null) || return 0
+    current=$(git -C "$tool" rev-parse HEAD 2>/dev/null) || return 0
+    [ "$current" != "$pinned" ] || return 0
+    [ -z "$(git -C "$tool" status --porcelain --untracked-files=no)" ] || return 0
+    git -C "$tool" cat-file -e "$pinned^{commit}" 2>/dev/null || git -C "$tool" fetch -q origin || return 0
+    git -C "$tool" merge-base --is-ancestor "$current" "$pinned" 2>/dev/null || return 0
+    git submodule update -q -- "$sub" || return 0
+    echo "rdash-sync: $sub follows the pin: ${current:0:7} -> ${pinned:0:7}"
+    # The files moved; the board process still runs the old ones (hebb, 2026-11-09: a
+    # merged pin served 404s until a hand restart). Stop it here, under the same user:
+    # rdash_service.py sees its health check fail and systemd starts the board again
+    # from the unit's own environment, on the checkout that is now on disk.
+    if "$tool/dashboard/app/research_dash.sh" status 2>/dev/null | grep -q running; then
+        "$tool/dashboard/app/research_dash.sh" stop >/dev/null 2>&1 \
+            && echo "rdash-sync: board stopped so its service restarts on ${pinned:0:7}"
+    fi
+}
+# Pathspec wildcards match across '/', so these cover cards/inbox/ and plan/days/ too.
+# plan/ joined on 2026-11-09: a checklist item deleted on the board (plan/LADDER.md)
+# blocked the hebb sync for ten hours, and with it every pin move.
+OWNED=('projects/*/cards/*' 'projects/*/runs/*' 'plan/*')
 
 branch=$(git symbolic-ref -q --short HEAD) || branch=
 if [ "$branch" != main ]; then
@@ -90,20 +118,22 @@ git fetch -q origin main || { report warn "git fetch failed; will retry"; exit 0
 
 exec 9>>"$root/.rdash.lock"
 flock -w 30 9 || { report busy "board writer lock held for 30 s; will retry"; exit 0; }
-other=$( { git diff --name-only; git diff --cached --name-only; } | grep -vE '^projects/[^/]+/(cards|runs)/' | sort -u | head -5)
+follow_pin
+other=$( { git diff --name-only; git diff --cached --name-only; } | grep -vE '^(projects/[^/]+/(cards|runs)|plan)/' | sort -u | head -5)
 if [ -n "$other" ]; then
-    report blocked "tracked changes outside cards/ and runs/ in the board checkout: $(echo $other)"; exit 0
+    report blocked "tracked changes outside cards/, runs/ and plan/ in the board checkout: $(echo $other)"; exit 0
 fi
 changed=$(git ls-files -z --modified --deleted --others --exclude-standard -- "${OWNED[@]}" | tr '\0' '\n' | sort -u)
 if [ -n "$changed" ]; then
     printf '%s\n' "$changed" | git add -A --pathspec-from-file=- \
-        && git commit -q -m "rdash: board edits and run receipts ($(hostname -s) sync)" \
+        && git commit -q -m "rdash: board edits, plan ticks and run receipts ($(hostname -s) sync)" \
         || { report warn "commit failed"; exit 1; }
 fi
 if ! git rebase -q origin/main >/dev/null 2>&1; then
     git rebase --abort >/dev/null 2>&1
     report conflict "local rdash commit does not rebase onto origin/main; kept locally, not pushed"; exit 1
 fi
+follow_pin
 flock -u 9
 if [ -n "$(git rev-list origin/main..HEAD)" ]; then
     git push -q origin HEAD:main 2>"$cache/push.err" || { report warn "push failed; will retry: $(tail -1 "$cache/push.err")"; exit 0; }
