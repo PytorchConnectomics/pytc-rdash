@@ -121,6 +121,7 @@ file. Read-only inspection and readiness/source checks do not mutate locks:
 - If `.agent-lock` exists and `started` is < 6 hours ago, another agent may be active — skip mutations to this project.
 - An older lock does not prove that its job stopped. Reconcile actual run/job state and ownership before takeover; this convention does not implement distributed locking or automatic recovery.
 - Use exclusive creation and remove only your own lock when done or on failure.
+- The holder may launch and edit cards under its own lock: export `RDASH_SESSION_ID` equal to the lock's `session_id` (rdash `safety.agent_lock_state`). A lock that is not this JSON is refused as unreadable.
 - `.agent-lock` files are gitignored.
 
 ## Session Log Format

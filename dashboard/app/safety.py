@@ -83,23 +83,39 @@ def writer_lock(settings):
                 os.close(fd)
 
 
-def agent_lock_state(project_dir):
+LOCK_FORMAT = '{"session_id": "...", "started": "<ISO-8601 with timezone>", "task": "..."}'
+
+
+def agent_lock_state(project_dir, session_id=None):
+    """Refuse writes while another session holds a fresh project `.agent-lock`.
+
+    The lock's own holder passes: `session_id` (default: $RDASH_SESSION_ID) equal to
+    the lock's non-empty `session_id` lets that session launch and edit cards
+    without releasing its lock first. Unreadable locks still fail closed.
+    """
     path = Path(project_dir) / ".agent-lock"
     if not path.exists() and not path.is_symlink():
         return
+    if session_id is None:
+        session_id = os.environ.get("RDASH_SESSION_ID", "")
     try:
         if path.is_symlink():
             raise ValueError()
-        started = datetime.fromisoformat(json.loads(path.read_text())["started"].replace("Z", "+00:00"))
+        lock = json.loads(path.read_text())
+        started = datetime.fromisoformat(lock["started"].replace("Z", "+00:00"))
         if started.tzinfo is None:
             raise ValueError()
         age = (datetime.now(timezone.utc) - started).total_seconds()
         if age < 0:
             raise ValueError()
     except (OSError, ValueError, KeyError, TypeError, AttributeError):
-        raise Error(423, "project_locked_unreadable", "Project lock timestamp is missing, unreadable, or in the future")
+        raise Error(423, "project_locked_unreadable",
+                    "Project lock %s is not JSON %s, or its time is in the future" % (path, LOCK_FORMAT))
+    if session_id and lock.get("session_id") == session_id:
+        return
     if age < 21600:
-        raise Error(423, "project_locked", "Project has a recent agent lock")
+        raise Error(423, "project_locked", "Project has a recent agent lock (%s); if it is your "
+                    "session's, set RDASH_SESSION_ID to its session_id" % lock.get("session_id", "?"))
 
 
 def _publish(path, data, exclusive):

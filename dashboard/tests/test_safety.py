@@ -54,6 +54,19 @@ class SafetyTests(RepoTest):
         cards.create_idea(self.settings, "alpha", "Allowed")
         self.assertFalse(lock.exists())
 
+    def test_agent_lock_own_session_passes(self):
+        lock = self.card.parents[1] / ".agent-lock"
+        now = datetime.now(timezone.utc).isoformat()
+        lock.write_text(json.dumps({"session_id": "s1", "started": now, "task": "t"}))
+        safety.agent_lock_state(lock.parent, session_id="s1")
+        for other in ("s2", ""):
+            self.error(423, "project_locked", safety.agent_lock_state, lock.parent, other)
+        lock.write_text(json.dumps({"started": now}))
+        self.error(423, "project_locked", safety.agent_lock_state, lock.parent, "s1")
+        lock.write_text("session=s1 " + now)
+        self.error(423, "project_locked_unreadable", safety.agent_lock_state, lock.parent, "s1")
+        lock.unlink()
+
     def test_atomic_link_readers_and_predictable_temp_symlink(self):
         target = self.card.parent / "new.md"
         outside = self.root / "untouched"
