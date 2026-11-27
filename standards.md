@@ -110,19 +110,39 @@ If a job fails, attempt one logical fix (halve batch size, verify path). If it f
 
 ## Agent Locking Convention
 
-Before project writes or execution, check ownership and exclusively create a lock
-file. Read-only inspection and readiness/source checks do not mutate locks:
+Before writes or execution, take a lock for the scope you will write. Read-only inspection and
+readiness/source checks take no lock. Two scopes, so sessions on different cards of one project
+do not block each other:
 
-```python
-# .agent-lock format (JSON)
-{"session_id": "abc123", "started": "2026-04-06T14:30:00Z", "task": "fiber_seg Stage 0b"}
+- **Card lock** `projects/<p>/.locks/cards/<card ref>.lock`: one card, its steps, launches and the
+  scripts and results it alone owns. The normal lock.
+- **Project lock** `projects/<p>/.agent-lock`: project-wide files (spec, state, loop, lessons, a new
+  card from the board) and every card. Take it only for that; it waits while others hold card locks.
+
+```bash
+export RDASH_SESSION_ID=<your session id>
+python3 -m dashboard.app.agent_lock take    --project <p> --card <ref>.md --task "what"
+python3 -m dashboard.app.agent_lock status  --project <p>
+python3 -m dashboard.app.agent_lock release --project <p> --card <ref>.md
 ```
 
-- If `.agent-lock` exists and `started` is < 6 hours ago, another agent may be active — skip mutations to this project.
-- An older lock does not prove that its job stopped. Reconcile actual run/job state and ownership before takeover; this convention does not implement distributed locking or automatic recovery.
-- Use exclusive creation and remove only your own lock when done or on failure.
-- The holder may launch and edit cards under its own lock: export `RDASH_SESSION_ID` equal to the lock's `session_id` (rdash `safety.agent_lock_state`). A lock that is not this JSON is refused as unreadable.
-- `.agent-lock` files are gitignored.
+```python
+# lock file format (JSON), both scopes
+{"session_id": "abc123", "started": "2026-04-06T14:30:00+00:00", "task": "fiber_seg Stage 0b"}
+```
+
+- `take` is an exclusive create; your own lock is refreshed in place. It refuses while another
+  session holds a fresh (< 6 h) lock that overlaps: the project lock overlaps every card, a card lock
+  overlaps its card and the project lock.
+- The board and launcher refuse a card write under another session's fresh lock on that card or on
+  the project, and a project-wide write under another session's fresh project lock. The holder
+  passes by exporting `RDASH_SESSION_ID` equal to the lock's `session_id`. A lock that is not this
+  JSON is refused as unreadable.
+- An older lock does not prove that its job stopped. Reconcile actual run/job state and ownership
+  before takeover; `release --stale` removes a foreign lock only once it is over 6 h old. This
+  convention does not implement distributed locking or automatic recovery.
+- `release` removes only your own lock. `.agent-lock` and `.locks/` are gitignored.
+- The supervisor (`dashboard/supervisor`) still takes the project lock for the projects it drives.
 
 ## Session Log Format
 

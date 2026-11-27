@@ -216,8 +216,8 @@ correctness, or permission to execute — never quote it as a green light.
 
 The card is the prompt. A fresh session gets the checkout path, the card path, and the
 execution host; it reads the nearest `CLAUDE.md`, `standards.md`, the card, and the
-project files the card links. Give it the lock discipline (`.agent-lock` in the project,
-exclusive create, release only your own) and the log destination
+project files the card links. Give it the lock discipline (a card lock,
+`python3 -m dashboard.app.agent_lock take --project <p> --card <ref>`; release only your own; `standards.md`) and the log destination
 (`projects/<project>/logs/YYYY-MM-DD_<task-slug>.md`).
 
 For a non-interactive delegated run:
