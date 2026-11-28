@@ -13,6 +13,7 @@ projects/<project>/focus/
   F-NNN/
     iter-01/
       plan.md              # Fable writes; frozen once Opus starts
+      effects.md           # Opus appends: intent before each submit/upload/push, settled after
       receipt.md           # Opus writes; facts only
       interpret.md         # Fable writes; verdict, Best update, next plan seed
     iter-02/ ...
@@ -23,7 +24,7 @@ projects/<project>/focus/
 | Step | Model | Reads | Writes |
 |---|---|---|---|
 | Plan | Fable | notebook, previous `interpret.md`, the project spec | `iter-NN/plan.md`, plus a `Next` line in the notebook |
-| Implement + run | Opus | `plan.md` (its whole brief), the files it links, `research/standards.md` | code, card, job, then `receipt.md` |
+| Implement + run | Opus | `plan.md` (its whole brief), the files it links, `research/standards.md`, `effects.md` if it exists | code, card, `effects.md` lines around each job, then `receipt.md` |
 | Interpret | Fable | `plan.md`, `receipt.md`, the raw result files the receipt names | `interpret.md`, then notebook `State` / `Best` / `Next` |
 
 ## Rules
@@ -44,8 +45,22 @@ projects/<project>/focus/
    `Recommendation:` line (the same block closes `interpret.md`). The board and
    `rdash/dashboard/app/needs_you.py` read that field; a free-text `Decision needed:` line is
    display, not the bell. `paused` is set by a person and rings nothing.
+8. **Intent before every external action, settlement after.** Before `rsub`/`sbatch`, a GCS
+   upload or a push to a shared branch, append `- intent En <time> <action> ... job-name=<exact>
+   comment=<exact> replay=never` to `iter-NN/effects.md`; when it returns, append
+   `- settled En <time> ok|error|aborted|unknown slurm=<id>`. A session that starts or resumes
+   an iteration reads `effects.md` first. An intent with no settled line means "may have run":
+   look it up by exact job-name and comment in `sacct`, settle it, or set `needs-you` asking
+   whether it ran. Never submit again while one is open. Template: [effects.md](effects.md).
+   (From the legacy rloop reservation rule and Agnes Harness's intent/settled ledger,
+   dw-os `workflow/reviews/2026-11-22-agnes-harness.md`.)
+9. **No `Best` row without a check that ran.** The receipt's `## Progress` block names the
+   proving check and its result (pass / fail / not run), what changed since the last
+   iteration, and FINISH / CONTINUE / SWITCH. Interpret may not add a `Best` row whose proving
+   check says `not run`. Run `python3 rloop/focus/planner-loop/check_receipt.py <iter-dir>`
+   before interpreting; exit 0 is required.
 
-Templates: [plan.md](plan.md) · [receipt.md](receipt.md) · [interpret.md](interpret.md).
+Templates: [plan.md](plan.md) · [effects.md](effects.md) · [receipt.md](receipt.md) · [interpret.md](interpret.md).
 
 ## CCC inside the implement step
 
