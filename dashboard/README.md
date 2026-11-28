@@ -197,7 +197,8 @@ person; a declared session alone never establishes liveness.
 Mutual exclusion holds only between cooperating rdash writers, via POSIX
 `flock` on the repository's gitignored `.rdash.lock`. The lock file remains in
 place; kernel ownership ends when its descriptor closes or its process dies.
-Revision checks and the `.agent-lock` courtesy check narrow but do not eliminate
+Revision checks and the agent-lock courtesy check (project `.agent-lock`, card
+`.locks/cards/<ref>.lock`; `standards.md`) narrow but do not eliminate
 races with editors or agents. An editor writing between rdash's locked re-read
 and atomic replacement can lose its change; pre-edit backups are the recovery
 aid, and may not include such an intervening edit. Fresh or unreadable agent

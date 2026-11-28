@@ -196,7 +196,7 @@ def tick(settings, project, ref, step, result, skip=False):
     text = ("skipped — " if skip else "") + result.strip()
     with writer_lock(settings):
         path = resolve_within(settings.repo_root, "projects", project, "cards", ref)
-        agent_lock_state(path.parents[1])
+        agent_lock_state(resolve_within(settings.repo_root, "projects", project), card=ref)
         data = path.read_bytes()
         _, lines, positions, quotes, _ = parse(data, project)
         pattern = re.compile(r"^- \[ \] \*\*%s\*\*" % re.escape(step))

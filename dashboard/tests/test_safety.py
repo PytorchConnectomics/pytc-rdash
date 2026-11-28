@@ -54,6 +54,54 @@ class SafetyTests(RepoTest):
         cards.create_idea(self.settings, "alpha", "Allowed")
         self.assertFalse(lock.exists())
 
+    def test_agent_lock_own_session_passes(self):
+        lock = self.card.parents[1] / ".agent-lock"
+        now = datetime.now(timezone.utc).isoformat()
+        lock.write_text(json.dumps({"session_id": "s1", "started": now, "task": "t"}))
+        safety.agent_lock_state(lock.parent, session_id="s1")
+        for other in ("s2", ""):
+            self.error(423, "project_locked", safety.agent_lock_state, lock.parent, other)
+        lock.write_text(json.dumps({"started": now}))
+        self.error(423, "project_locked", safety.agent_lock_state, lock.parent, "s1")
+        lock.write_text("session=s1 " + now)
+        self.error(423, "project_locked_unreadable", safety.agent_lock_state, lock.parent, "s1")
+        lock.unlink()
+
+    def test_card_locks_let_sessions_share_a_project(self):
+        project = self.card.parents[1]
+        card = self.card.name
+        lock = safety.take_lock(project, "s1", "card work", card=card)
+        self.assertEqual(lock, project / ".locks" / "cards" / (card + ".lock"))
+        safety.agent_lock_state(project, "s1", card=card)
+        self.error(423, "card_locked", safety.agent_lock_state, project, "s2", card)
+        safety.agent_lock_state(project, "s2", card="other.md")      # another card: free
+        safety.agent_lock_state(project, "s2")                       # project-wide write: free
+        safety.take_lock(project, "s2", "other card", card="other.md")
+        self.error(423, "card_locked", safety.take_lock, project, "s2", "t", card)
+        self.error(423, "cards_locked", safety.take_lock, project, "s3", "whole project")
+        revision = cards.read_card(self.settings, "alpha", "question.md")["revision"]
+        with mock.patch.dict(os.environ, RDASH_SESSION_ID="s2"):
+            self.error(423, "card_locked", cards.edit_card, self.settings, "alpha", card, revision, stage="parked")
+        with mock.patch.dict(os.environ, RDASH_SESSION_ID="s1"):
+            cards.edit_card(self.settings, "alpha", card, revision, stage="parked")
+        before = lock.read_text()
+        safety.take_lock(project, "s1", "refreshed", card=card)       # own lock: refreshed in place
+        self.assertIn("refreshed", lock.read_text())
+        self.error(423, "not_your_lock", safety.release_lock, project, "s2", card)
+        self.error(423, "not_your_lock", safety.release_lock, project, "s2", card, True)  # fresh: --stale refuses
+        self.assertEqual(safety.release_lock(project, "s1", card), lock)
+        self.assertFalse(lock.exists())
+        old = project / ".locks" / "cards" / "other.md.lock"
+        old.write_text(json.dumps(dict(session_id="s2", started="2020-01-01T00:00:00+00:00", task="t")))
+        self.error(423, "lock_stale_foreign", safety.take_lock, project, "s3", "t", "other.md")
+        safety.take_lock(project, "s3", "whole project")              # stale card locks do not block
+        self.error(423, "project_locked", safety.take_lock, project, "s1", "t", card)
+        self.assertEqual(safety.release_lock(project, "s1", "other.md", stale=True), old)
+        safety.release_lock(project, "s3")
+        self.assertFalse((project / ".agent-lock").exists())
+        self.error(400, "session_required", safety.take_lock, project, "", "t", card)
+        self.error(400, "invalid_card", safety.take_lock, project, "s1", "t", "../x.md")
+
     def test_atomic_link_readers_and_predictable_temp_symlink(self):
         target = self.card.parent / "new.md"
         outside = self.root / "untouched"

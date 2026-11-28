@@ -165,7 +165,7 @@ def edit_card(settings, project, ref, revision, *, stage=None, text=None):
         text = _note(text, "text")
     with writer_lock(settings):
         path = _path(settings, project, ref)
-        agent_lock_state(path.parents[2] if ref.startswith("inbox/") else path.parents[1])
+        agent_lock_state(resolve_within(settings.repo_root, "projects", project), card=ref)
         data = path.read_bytes()
         try:
             _, lines, positions, quotes, end = parse(data, project)

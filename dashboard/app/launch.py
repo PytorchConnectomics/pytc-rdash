@@ -179,11 +179,11 @@ def card_text(settings, project, ref, git_ref=None):
     """The card as of `git_ref`, or the working tree's addressable card."""
     if git_ref is None:
         path = _path(settings, project, ref)
-        agent_lock_state(path.parents[1])
+        agent_lock_state(settings.repo_root / "projects" / project, card=ref)
         return path.read_text(encoding="utf-8")
     project_id(project)
     card_ref(ref)
-    agent_lock_state(settings.repo_root / "projects" / project)
+    agent_lock_state(settings.repo_root / "projects" / project, card=ref)
     if not GIT_REF.fullmatch(git_ref) or ".." in git_ref:
         raise Error(400, "invalid_ref", "Invalid git ref")
     try:
