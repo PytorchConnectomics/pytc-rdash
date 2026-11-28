@@ -17,14 +17,22 @@ Zetta's production training/inference code for every voxel-wise model behind its
 
 Browse: https://archive.softwareheritage.org/browse/origin/directory/?origin_url=https://github.com/ZettaAI/DeepEM
 
-A full bare git repository (all branches) was requested from the SWH Vault on 2026-11-06
-(cook id 422385639). Check its status and download it:
+**Local copy (2026-11-28): a002 `/projects/weilab/weidf/lib/pytorch_connectomics/lib/DeepEM-zettaai`**,
+cloned from the SWH Vault bare repo, with the original tarball kept beside it as
+`DeepEM-zettaai.swh-2026-08-25.git.tar` (39.8 MB). In the clone, `master` is the 2022 default branch
+(`6b982b6`); the 2026 work is on feature branches. Every snapshot ref is under `refs/swh-all/`
+(55 `heads/`, 29 `pull/`, 8 `tags/`): newest is `refs/swh-all/heads/feature/sr-zero-pad` (2026-08-18).
+For example: `git log swh-all/heads/feature/class-registry`. An earlier download on hebb (2026-11-09) sat in a
+session scratchpad and was lost; don't keep copies in scratch space.
+
+The bare repo came from the SWH Vault (cook id 422385639, requested 2026-11-06, still `done` on 2026-11-28).
+To download it again:
 
 ```bash
 SNP=swh:1:snp:a5da2b8efcdd6a8ba2c14dc1ac54a5c788be951d
 curl -s https://archive.softwareheritage.org/api/1/vault/git-bare/$SNP/          # status: new → pending → done
 curl -L -o deepem.git.tar https://archive.softwareheritage.org/api/1/vault/git-bare/$SNP/raw/
-tar xf deepem.git.tar && git clone <extracted>.git DeepEM
+tar xf deepem.git.tar && git clone "$SNP.git" DeepEM-zettaai
 ```
 
 Anonymous API use is limited to 120 requests/hour; a free SWH account token raises it.

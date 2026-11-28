@@ -34,7 +34,7 @@
 
 ## ZettaAI fork (2026)
 
-Zetta continued DeepEM privately to 2026-08 (class registry, isotropic upsampling fix, EMA/BF16/DDP, MALIS, synaptic-partner heads). Archived copy and branch timeline: [zettaai/deep-learning/DeepEM.md](zettaai/deep-learning/DeepEM.md).
+Zetta continued DeepEM privately to 2026-08 (class registry, isotropic upsampling fix, EMA/BF16/DDP, MALIS, synaptic-partner heads). Archived copy (a002 `lib/DeepEM-zettaai`, next to this one) and branch timeline: [zettaai/deep-learning/DeepEM.md](zettaai/deep-learning/DeepEM.md).
 
 ## References
 
